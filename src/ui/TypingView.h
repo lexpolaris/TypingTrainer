@@ -33,6 +33,7 @@ public slots:
 
 signals:
     void codeHintRequested(QChar current, QChar next);
+    void codeHintCleared();   // 打对时清除提示
 
 protected:
     // ---------------- 键盘输入 ----------------

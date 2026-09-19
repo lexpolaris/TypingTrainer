@@ -33,9 +33,17 @@ void TypingView::setSession(TypingSession* s)
     if (m_session) {
         connect(m_session, &TypingSession::positionChanged,
                 this, &TypingView::onPositionChanged);
+
+        // 只在打错时请求编码提示
         connect(m_session, &TypingSession::positionChanged,
-                this, [this](int idx, bool) {
+                this, [this](int idx, bool correct) {
             if (!m_session || !m_doc) return;
+            if (correct) {
+                // 打对了，清除提示
+                emit codeHintCleared();
+                return;
+            }
+            // 打错了，请求提示
             QChar cur = (idx < m_doc->length()) ? m_doc->at(idx) : QChar();
             QChar nxt = (idx + 1 < m_doc->length()) ? m_doc->at(idx + 1) : QChar();
             emit codeHintRequested(cur, nxt);

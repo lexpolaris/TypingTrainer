@@ -66,20 +66,23 @@ void MainWindow::setupUi()
     root->setContentsMargins(0, 0, 0, 0);
     root->setSpacing(0);
 
-    // 视图（唯一内容区，无顶部工具条）
+    // 视图（唯一内容区）
     m_view = new PacmanView(central);
     m_view->setSession(m_session);
     m_view->setDocument(m_doc);
     root->addWidget(m_view, 1);
 
-    // 编码提示面板
-    m_codeHint = new CodeHintPanel(central);
-    root->addWidget(m_codeHint);
-
     setCentralWidget(central);
 
+    // 编码提示（浮动，不加入布局，父对象设为主窗口）
+    m_codeHint = new CodeHintPanel(this);
+    m_codeHint->hide();
+
+    // 信号连接
     connect(m_view, &TypingView::codeHintRequested,
             this, &MainWindow::onCodeHintRequested);
+    connect(m_view, &TypingView::codeHintCleared,
+            m_codeHint, &CodeHintPanel::clear);
 }
 
 void MainWindow::ensureViewFocus()
