@@ -30,6 +30,8 @@ private slots:
     void onCodeHintRequested(QChar current, QChar next);
     void updateStats();
     void onOpenTextLibrary();
+    void onSpeedPointSettings();
+    void onShowSpeedChart();
 
 private:
     void setupUi();
@@ -40,6 +42,7 @@ private:
     void loadBuiltinCodeTable(const QString& name);
     void loadText(const QString& path);
     void loadResourceText(const QString& resPath);
+    void startSessionForText(const QString& targetText, const QString& name);
 
     // 数据
     TextDocument*  m_doc = nullptr;

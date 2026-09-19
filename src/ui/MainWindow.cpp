@@ -11,6 +11,8 @@
 #include "utils/AppPaths.h"
 #include "utils/TextLoader.h"
 #include "TextLibraryDialog.h"
+#include "SpeedPointDialog.h"
+#include "SpeedChartDialog.h"
 
 #include <QMenuBar>
 #include <QMenu>
@@ -109,6 +111,13 @@ void MainWindow::setupMenus()
     auto* modeMenu = menuBar()->addMenu(tr("模式(&M)"));
     modeMenu->addAction(tr("吃豆人模式"), this, [this] { m_modeCombo->setCurrentIndex(0); });
     modeMenu->addAction(tr("双行对照模式"), this, [this] { m_modeCombo->setCurrentIndex(1); });
+
+    // 测速
+    auto* speedMenu = menuBar()->addMenu(tr("测速(&S)"));
+    speedMenu->addAction(tr("设置测速点..."), QKeySequence("Ctrl+Shift+S"),
+                        this, &MainWindow::onSpeedPointSettings);
+    speedMenu->addAction(tr("查看测速结果..."), QKeySequence("Ctrl+Shift+R"),
+                        this, &MainWindow::onShowSpeedChart);
 
     // 码表
     auto* codeMenu = menuBar()->addMenu(tr("码表(&C)"));
@@ -364,4 +373,52 @@ void MainWindow::onOpenTextLibrary()
             loadText(path);
     });
     dlg.exec();
+}
+
+void MainWindow::onSpeedPointSettings()
+{
+    if (!m_doc || m_doc->isEmpty()) {
+        QMessageBox::information(this, tr("测速点"),
+            tr("请先加载文本。"));
+        return;
+    }
+
+    SpeedPointDialog dlg(m_doc->text(), this);
+    if (dlg.exec() != QDialog::Accepted) return;
+
+    QVector<int> pts = dlg.selectedPoints();
+    m_session->setSpeedPoints(pts);
+    statusBar()->showMessage(
+        tr("已设置 %1 个测速点").arg(pts.size()), 3000);
+}
+
+void MainWindow::onShowSpeedChart()
+{
+    if (!m_session || m_session->state() != TypingSession::Finished) {
+        // 未完成时也允许查看（后续可用）
+        if (m_session->currentIndex() == 0) {
+            QMessageBox::information(this, tr("测速结果"),
+                tr("尚未开始跟打。"));
+            return;
+        }
+    }
+
+    SpeedChartDialog dlg(m_session, m_doc->text(), this);
+    connect(&dlg, &SpeedChartDialog::requestRetry, this,
+            [this](const QString& segText) {
+        startSessionForText(segText, m_doc->name() + " (重打段)");
+    });
+    dlg.exec();
+}
+
+void MainWindow::startSessionForText(const QString& targetText,
+                                     const QString& name)
+{
+    m_doc->loadFromString(targetText, name);
+    m_session->setSpeedPoints({});
+    m_session->start(targetText);
+    m_view->setDocument(m_doc);
+    m_view->update();
+    setWindowTitle(tr("打字练习 - %1").arg(name));
+    updateStats();
 }

@@ -11,7 +11,7 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-find_package(Qt6 REQUIRED COMPONENTS Widgets Core Gui)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Core Gui Charts)
 
 # 可选：图表、数据库（后续阶段启用）
 find_package(Qt6 COMPONENTS Charts Sql QUIET)
@@ -38,6 +38,9 @@ set(SOURCES
     src/ui/CodeHintPanel.cpp
     src/utils/AppPaths.cpp
     src/utils/TextLoader.cpp
+    src/core/SpeedPointFinder.cpp
+    src/ui/SpeedPointDialog.cpp
+    src/ui/SpeedChartDialog.cpp
 )
 
 set(HEADERS
@@ -55,6 +58,9 @@ set(HEADERS
     src/ui/CodeHintPanel.h
     src/utils/AppPaths.h
     src/utils/TextLoader.h
+    src/core/SpeedPointFinder.h
+    src/ui/SpeedPointDialog.h
+    src/ui/SpeedChartDialog.h
 )
 
 add_executable(TypingTrainer ${SOURCES} ${HEADERS} resources/resources.qrc)
@@ -65,6 +71,7 @@ target_link_libraries(TypingTrainer PRIVATE
     Qt6::Widgets
     Qt6::Core
     Qt6::Gui
+    Qt6::Charts
 )
 
 if(Qt6Charts_FOUND)
