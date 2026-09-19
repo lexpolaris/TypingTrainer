@@ -31,6 +31,7 @@ set(SOURCES
     src/core/CodeTable.cpp
     src/theme/ThemeManager.cpp
     src/ui/MainWindow.cpp
+    src/ui/TextLibraryDialog.cpp
     src/ui/TypingView.cpp
     src/ui/PacmanView.cpp
     src/ui/TwoLineView.cpp
@@ -47,6 +48,7 @@ set(HEADERS
     src/core/CodeTable.h
     src/theme/ThemeManager.h
     src/ui/MainWindow.h
+    src/ui/TextLibraryDialog.h
     src/ui/TypingView.h
     src/ui/PacmanView.h
     src/ui/TwoLineView.h

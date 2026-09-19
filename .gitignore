@@ -10,3 +10,4 @@ build-*/
 *.app/
 CMakeCache.txt
 CMakeFiles/
+build

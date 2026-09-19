@@ -10,6 +10,7 @@
 #include "theme/ThemeManager.h"
 #include "utils/AppPaths.h"
 #include "utils/TextLoader.h"
+#include "TextLibraryDialog.h"
 
 #include <QMenuBar>
 #include <QMenu>
@@ -98,6 +99,8 @@ void MainWindow::setupMenus()
     auto* fileMenu = menuBar()->addMenu(tr("文件(&F)"));
     fileMenu->addAction(tr("打开文本..."), QKeySequence::Open,
                         this, &MainWindow::onOpenText);
+    fileMenu->addAction(tr("文本库..."), QKeySequence("Ctrl+L"),
+                    this, &MainWindow::onOpenTextLibrary);
     fileMenu->addSeparator();
     fileMenu->addAction(tr("退出"), QKeySequence::Quit,
                         this, &QWidget::close);
@@ -348,4 +351,17 @@ void MainWindow::inputMethodEvent(QInputMethodEvent* e)
             m_session->inputCharacter(ch);
     }
     e->accept();
+}
+
+void MainWindow::onOpenTextLibrary()
+{
+    TextLibraryDialog dlg(this);
+    connect(&dlg, &TextLibraryDialog::textChosen, this,
+            [this](const QString& path) {
+        if (path.startsWith(":/"))
+            loadResourceText(path);
+        else
+            loadText(path);
+    });
+    dlg.exec();
 }

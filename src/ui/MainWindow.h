@@ -29,6 +29,7 @@ private slots:
     void onThemeModeChanged(int index);
     void onCodeHintRequested(QChar current, QChar next);
     void updateStats();
+    void onOpenTextLibrary();
 
 private:
     void setupUi();
