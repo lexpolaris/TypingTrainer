@@ -17,12 +17,22 @@ public:
     QVariant get(const QString& key, const QVariant& defaultValue = {}) const;
     void set(const QString& key, const QVariant& value);
 
-    // 便捷
+    // ---- 主题 ----
+    QString themeMode() const;
+    QHash<int, QColor> customThemeColors() const;
+    void setCustomThemeColors(const QHash<int, QColor>& colors);
+
+    // ---- 字体 ----
+    QFont typingFont() const;
+    void setTypingFont(const QFont& f);
+
+    // ---- 其他 ----
     QString lastTextPath() const;
+    QString currentCodeTable() const;
+
+    // 便捷
     int     fontPointSize() const;
     QString fontFamily() const;
-    QString themeMode() const;         // "system" / "light" / "dark"
-    QString currentCodeTable() const;  // "wubi86" / "wubi98" / "zhengma" / 用户路径
 
 private:
     explicit ConfigManager(QObject* parent = nullptr);

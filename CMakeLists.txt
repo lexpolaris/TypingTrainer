@@ -42,6 +42,7 @@ set(SOURCES
     src/ui/SpeedPointDialog.cpp
     src/ui/SpeedChartDialog.cpp
     src/ui/WrappedTextView.cpp
+    src/ui/SettingsDialog.cpp
 )
 
 set(HEADERS
@@ -63,6 +64,7 @@ set(HEADERS
     src/ui/SpeedPointDialog.h
     src/ui/SpeedChartDialog.h
     src/ui/WrappedTextView.h
+    src/ui/SettingsDialog.h
 )
 
 add_executable(TypingTrainer ${SOURCES} ${HEADERS} resources/resources.qrc)

@@ -27,6 +27,7 @@ private slots:
     void onShowSpeedChart();
     void onCodeHintRequested(QChar current, QChar next);
     void updateStats();
+    void onOpenSettings();
 
 private:
     void setupUi();
@@ -53,4 +54,7 @@ private:
     QLabel*        m_statusKey = nullptr;
     QLabel*        m_statusCode = nullptr;
     QLabel*        m_statusProgress = nullptr;
+
+    void applyTypingFont(const QFont& f);
+    QFont m_currentTypingFont;
 };

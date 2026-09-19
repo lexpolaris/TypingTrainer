@@ -47,16 +47,25 @@ public:
     // 取色（核心接口）
     QColor color(Role role) const;
 
-    // 自定义覆盖接口
+    // ---- 自定义覆盖 ----
     void setCustomColor(Role role, const QColor& color);
     void clearCustomColor(Role role);
     void clearAllCustomColors();
     bool hasCustomColor(Role role) const;
 
-    // 生成 QSS 样式表（供 QApplication::setStyleSheet 使用）
-    QString styleSheet() const;
+    /// 返回当前自定义颜色表（用于持久化）
+    QHash<int, QColor> customColors() const { return m_customColors; }
 
-    // 应用主题到整个应用（设置 QPalette + QSS）
+    /// 从持久化数据恢复（启动时调用）
+    void setCustomColors(const QHash<int, QColor>& colors);
+
+    /// 角色的可读名称（UI 显示）
+    static QString roleName(Role role);
+
+    /// 角色列表（UI 遍历）
+    static QVector<Role> allRoles();
+
+    QString styleSheet() const;
     void applyToApplication();
 
 signals:
@@ -74,7 +83,6 @@ private:
     bool m_isDark = false;
     QHash<int, QColor> m_customColors;
 
-    // 两套默认调色板
     QHash<int, QColor> m_lightPalette;
     QHash<int, QColor> m_darkPalette;
 };

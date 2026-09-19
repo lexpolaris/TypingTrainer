@@ -7,6 +7,7 @@
 #include "TextLibraryDialog.h"
 #include "SpeedPointDialog.h"
 #include "SpeedChartDialog.h"
+#include "SettingsDialog.h"
 
 #include "core/TextDocument.h"
 #include "core/TypingSession.h"
@@ -100,6 +101,9 @@ void MainWindow::setupMenus()
                         this, &MainWindow::onOpenText);
     fileMenu->addAction(tr("文本库..."), QKeySequence("Ctrl+L"),
                         this, &MainWindow::onOpenTextLibrary);
+    fileMenu->addSeparator();
+    fileMenu->addAction(tr("设置..."), QKeySequence("Ctrl+,"),
+                        this, &MainWindow::onOpenSettings);
     fileMenu->addSeparator();
     fileMenu->addAction(tr("退出"), QKeySequence::Quit,
                         this, &QWidget::close);
@@ -201,18 +205,48 @@ void MainWindow::applyConfigToUi()
 {
     auto& cfg = ConfigManager::instance();
 
-    // 主题
+    // 主题模式
     QString tm = cfg.themeMode();
     ThemeManager::Mode m = ThemeManager::System;
     if (tm == "light") m = ThemeManager::Light;
     else if (tm == "dark") m = ThemeManager::Dark;
     ThemeManager::instance().setMode(m);
 
+    // 自定义颜色
+    QHash<int, QColor> customColors = cfg.customThemeColors();
+    ThemeManager::instance().setCustomColors(customColors);
+
     // 字体
-    QFont f = font();
-    if (!cfg.fontFamily().isEmpty()) f.setFamily(cfg.fontFamily());
-    f.setPointSize(cfg.fontPointSize());
-    m_view->setTypingFont(f);
+    QFont f = cfg.typingFont();
+    if (f.family().isEmpty()) {
+        f = font();
+        f.setPointSize(18);
+    }
+    applyTypingFont(f);
+}
+
+void MainWindow::applyTypingFont(const QFont& f)
+{
+    m_currentTypingFont = f;
+    if (m_view) m_view->setTypingFont(f);
+}
+
+void MainWindow::onOpenSettings()
+{
+    SettingsDialog dlg(this);
+
+    // 实时预览连接
+    connect(&dlg, &SettingsDialog::fontPreview,
+            this, &MainWindow::applyTypingFont);
+    connect(&dlg, &SettingsDialog::themeColorsPreview,
+            this, [this](const QHash<int, QColor>& colors) {
+        ThemeManager::instance().setCustomColors(colors);
+    });
+    // themeModePreview 由 SettingsDialog 内部直接调 ThemeManager，
+    // 无需在这里额外处理
+
+    dlg.exec();
+    ensureViewFocus();
 }
 
 void MainWindow::saveConfigFromUi()
@@ -315,6 +349,8 @@ void MainWindow::switchMode(bool pacman)
     TypingView* old = m_view;
     m_view = newView;
     old->deleteLater();
+
+    newView->setTypingFont(m_currentTypingFont);
 
     connect(m_view, &TypingView::codeHintRequested,
             this, &MainWindow::onCodeHintRequested);

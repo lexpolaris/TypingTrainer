@@ -253,3 +253,44 @@ QString ThemeManager::styleSheet() const
         .arg(c(TextSecondary))  // 7
         .arg(c(Highlight));     // 8
 }
+
+QString ThemeManager::roleName(Role role)
+{
+    switch (role) {
+    case WindowBg:      return QObject::tr("窗口背景");
+    case SurfaceBg:     return QObject::tr("面板背景");
+    case Border:        return QObject::tr("边框");
+    case TextPrimary:   return QObject::tr("主要文字");
+    case TextSecondary: return QObject::tr("次要文字");
+    case TextDisabled:  return QObject::tr("禁用文字");
+    case Accent:        return QObject::tr("强调色");
+    case AccentText:    return QObject::tr("强调文字");
+    case Typed:         return QObject::tr("已打字符");
+    case Current:       return QObject::tr("当前字符");
+    case Pending:       return QObject::tr("未打字符");
+    case Error:         return QObject::tr("错误字符");
+    case Pacman:        return QObject::tr("吃豆人色");
+    case Highlight:     return QObject::tr("高亮背景");
+    case SelectionBg:   return QObject::tr("选中背景");
+    case SelectionText: return QObject::tr("选中文字");
+    }
+    return {};
+}
+
+QVector<ThemeManager::Role> ThemeManager::allRoles()
+{
+    return {
+        WindowBg, SurfaceBg, Border,
+        TextPrimary, TextSecondary, TextDisabled,
+        Accent, AccentText,
+        Typed, Current, Pending, Error,
+        Pacman, Highlight, SelectionBg, SelectionText
+    };
+}
+
+void ThemeManager::setCustomColors(const QHash<int, QColor>& colors)
+{
+    m_customColors = colors;
+    applyToApplication();
+    emit themeChanged();
+}

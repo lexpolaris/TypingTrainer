@@ -5,6 +5,8 @@
 #include <QFile>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QColor>
+#include <QFont>
 #include <QDebug>
 #include <functional>
 
@@ -123,4 +125,45 @@ QString ConfigManager::themeMode() const
 QString ConfigManager::currentCodeTable() const
 {
     return get("typing.currentCodeTable", "wubi86").toString();
+}
+
+QHash<int, QColor> ConfigManager::customThemeColors() const
+{
+    QHash<int, QColor> result;
+    QJsonObject obj = get("theme.customColors").toJsonObject();
+    for (auto it = obj.begin(); it != obj.end(); ++it) {
+        bool ok = false;
+        int role = it.key().toInt(&ok);
+        if (!ok) continue;
+        QColor c(it.value().toString());
+        if (c.isValid()) result.insert(role, c);
+    }
+    return result;
+}
+
+void ConfigManager::setCustomThemeColors(const QHash<int, QColor>& colors)
+{
+    QJsonObject obj;
+    for (auto it = colors.begin(); it != colors.end(); ++it) {
+        obj.insert(QString::number(it.key()), it.value().name());
+    }
+    set("theme.customColors", obj);
+}
+
+QFont ConfigManager::typingFont() const
+{
+    QFont f;
+    f.setFamily(get("font.family", "").toString());
+    f.setPointSize(get("font.pointSize", 18).toInt());
+    f.setBold(get("font.bold", false).toBool());
+    f.setItalic(get("font.italic", false).toBool());
+    return f;
+}
+
+void ConfigManager::setTypingFont(const QFont& f)
+{
+    set("font.family", f.family());
+    set("font.pointSize", f.pointSize());
+    set("font.bold", f.bold());
+    set("font.italic", f.italic());
 }
