@@ -1,5 +1,6 @@
 // src/ui/MainWindow.h
 #pragma once
+
 #include <QMainWindow>
 
 class TextDocument;
@@ -8,7 +9,6 @@ class CodeTable;
 class TypingView;
 class CodeHintPanel;
 class QLabel;
-class QComboBox;
 
 class MainWindow : public QMainWindow
 {
@@ -17,21 +17,16 @@ public:
     explicit MainWindow(QWidget* parent = nullptr);
     ~MainWindow() override;
 
-protected:
-    void keyPressEvent(QKeyEvent* e) override;
-    void inputMethodEvent(QInputMethodEvent* e) override;
-
 private slots:
     void onOpenText();
-    void onSwitchMode(int index);
-    void onLoadCodeTable(int index);
-    void onImportCodeTable();
-    void onThemeModeChanged(int index);
-    void onCodeHintRequested(QChar current, QChar next);
-    void updateStats();
     void onOpenTextLibrary();
+    void onSwitchModePacman();
+    void onSwitchModeTwoLine();
+    void onImportCodeTable();
     void onSpeedPointSettings();
     void onShowSpeedChart();
+    void onCodeHintRequested(QChar current, QChar next);
+    void updateStats();
 
 private:
     void setupUi();
@@ -42,7 +37,9 @@ private:
     void loadBuiltinCodeTable(const QString& name);
     void loadText(const QString& path);
     void loadResourceText(const QString& resPath);
+    void switchMode(bool pacman);
     void startSessionForText(const QString& targetText, const QString& name);
+    void ensureViewFocus();
 
     // 数据
     TextDocument*  m_doc = nullptr;
@@ -56,5 +53,4 @@ private:
     QLabel*        m_statusKey = nullptr;
     QLabel*        m_statusCode = nullptr;
     QLabel*        m_statusProgress = nullptr;
-    QComboBox*     m_modeCombo = nullptr;
 };

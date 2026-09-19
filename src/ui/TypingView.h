@@ -1,5 +1,6 @@
 // src/ui/TypingView.h
 #pragma once
+
 #include <QWidget>
 #include <QFont>
 
@@ -23,14 +24,32 @@ public:
     QFont typingFont() const { return m_font; }
 
 public slots:
-    virtual void onPositionChanged(int index, bool correct) { Q_UNUSED(index); Q_UNUSED(correct); update(); }
+    virtual void onPositionChanged(int index, bool correct)
+    {
+        Q_UNUSED(index);
+        Q_UNUSED(correct);
+        update();
+    }
 
 signals:
     void codeHintRequested(QChar current, QChar next);
 
 protected:
+    // ---------------- 键盘输入 ----------------
+    void keyPressEvent(QKeyEvent* e) override;
+    void inputMethodEvent(QInputMethodEvent* e) override;
+
+    // ---------------- 焦点管理 ----------------
+    void mousePressEvent(QMouseEvent* e) override;
+    void focusInEvent(QFocusEvent* e) override;
+    void focusOutEvent(QFocusEvent* e) override;
+
+    // ---------------- 数据 ----------------
     TypingSession* m_session = nullptr;
     TextDocument*  m_doc = nullptr;
     CodeTable*     m_codeTable = nullptr;
     QFont          m_font;
+
+private:
+    void handleKeyInput(QChar ch);
 };
