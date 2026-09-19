@@ -3,7 +3,8 @@
         <file>texts/岳阳楼记.txt</file>
     </qresource>
     <qresource prefix="/">
-        <!-- 后续放入 wubi86.txt / wubi98.txt / zhengma.txt -->
-        <file>tables/sample.txt</file>
+        <file>tables/wubi86.txt</file>
+        <file>tables/wubi98.txt</file>
+        <file>tables/zhengma.txt</file>
     </qresource>
 </RCC>
