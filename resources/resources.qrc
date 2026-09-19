@@ -1,0 +1,9 @@
+<RCC>
+    <qresource prefix="/">
+        <file>texts/岳阳楼记.txt</file>
+    </qresource>
+    <qresource prefix="/">
+        <!-- 后续放入 wubi86.txt / wubi98.txt / zhengma.txt -->
+        <file>tables/sample.txt</file>
+    </qresource>
+</RCC>

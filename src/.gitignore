@@ -1,0 +1,12 @@
+build/
+build-*/
+*.user
+*.autosave
+.vscode/
+.idea/
+*.o
+*.obj
+*.exe
+*.app/
+CMakeCache.txt
+CMakeFiles/
