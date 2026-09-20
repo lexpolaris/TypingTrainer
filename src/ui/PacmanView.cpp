@@ -21,6 +21,11 @@ void PacmanView::onPositionChanged(int index, bool correct)
     } else {
         // 打对推进时，若该位置之前被标记为错误，清除标记
         m_errorIndices.removeAll(index);
+        // 同时清理所有 >= index 的标记（回退后重打）
+        for (int i = m_errorIndices.size() - 1; i >= 0; --i) {
+            if (m_errorIndices[i] >= index)
+                m_errorIndices.removeAt(i);
+        }
     }
 
     // 交给基类处理滚动与重绘

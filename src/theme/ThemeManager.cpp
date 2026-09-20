@@ -109,7 +109,8 @@ QColor ThemeManager::color(Role role) const
     // 1. 自定义优先
     auto it = m_customColors.find(static_cast<int>(role));
     if (it != m_customColors.end())
-        return it.value();
+        if (it.value().isValid())
+            return it.value();
     // 2. 默认调色板
     const auto& pal = m_isDark ? m_darkPalette : m_lightPalette;
     return pal.value(static_cast<int>(role), Qt::magenta);

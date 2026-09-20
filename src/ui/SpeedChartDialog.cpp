@@ -157,7 +157,7 @@ QVector<SegmentStat> SpeedChartDialog::computeSegments() const
     };
 
     // 第一段
-    int prevPos = 0;
+    int prevPos = m_session->initialStartIndex();
     int prevKeys = 0;
     int prevBacks = 0;
     double prevTime = 0;
@@ -272,6 +272,8 @@ void SpeedChartDialog::fillTable(const QVector<SegmentStat>& segs)
 void SpeedChartDialog::buildChart(const QVector<SegmentStat>& segs)
 {
 #ifdef HAVE_QTCHARTS
+    if (segs.isEmpty()) return;
+
     auto& th = ThemeManager::instance();
 
     auto* series = new QLineSeries();
@@ -383,6 +385,10 @@ QPixmap SpeedChartDialog::renderToPixmap() const
     QPixmap tablePm = m_table->grab();
     const int tableY = 44;
     p.drawPixmap(12, tableY, tablePm);
+
+    // ---- 预览 ----
+    QPixmap previewPm = m_preview->grab();
+    p.drawPixmap(12 + tablePm.width() + 8, tableY, previewPm);
 
     // ---- 图表 ----
 #ifdef HAVE_QTCHARTS

@@ -16,7 +16,7 @@ CodeHintPanel::CodeHintPanel(QWidget* parent) : QWidget(parent)
     // 浮动：不参与布局
     setAttribute(Qt::WA_TransparentForMouseEvents, false);
     setAttribute(Qt::WA_ShowWithoutActivating, true);
-    setWindowFlags(Qt::ToolTip | Qt::FramelessWindowHint);
+    setWindowFlags(Qt::Tool | Qt::FramelessWindowHint);
     setFocusPolicy(Qt::NoFocus);
 
     // 内容
@@ -111,6 +111,8 @@ void CodeHintPanel::repositionToParent()
 {
     QWidget* p = parentWidget();
     if (!p) return;
+    // 若父窗口隐藏或最小化，直接返回
+    if (!p->isVisible()) return;
 
     // 定位到父窗口底部中央，向上偏移 60px
     const int margin = 24;

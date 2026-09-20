@@ -4,6 +4,8 @@
 #include <QJsonObject>
 #include <QVariant>
 #include <QString>
+#include <QColor>
+#include <QFont>
 
 class ConfigManager : public QObject
 {

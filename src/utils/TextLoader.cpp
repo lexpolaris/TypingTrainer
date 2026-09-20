@@ -31,25 +31,13 @@ QString TextLoader::decode(const QByteArray& raw)
             return s;
     }
 
-    // GBK 兜底（Qt 6 通过 QStringConverter 支持 GBK？）
-    // Qt 6 内置编码有限，GBK 需要 Qt5Compat 或 iconv
-    // 方案 A：用 QTextCodec（需 Qt5Compat）
-    // 方案 B：用系统 iconv（Linux/macOS）或 Win32 API（Windows）
-    // 这里给出跨平台方案 B 的实现
-#ifdef Q_OS_WIN
-    // Windows 下用 MultiByteToWideChar
-    #include <windows.h>
-    int wlen = MultiByteToWideChar(936 /*GBK*/, 0, raw.constData(), raw.size(), nullptr, 0);
-    if (wlen > 0) {
-        std::wstring wbuf(wlen, L'\0');
-        MultiByteToWideChar(936, 0, raw.constData(), raw.size(), &wbuf[0], wlen);
-        return QString::fromWCharArray(wbuf.data(), wlen);
+    // 用本地编码兜底（locale 通常为 UTF-8，GBK 仍可能乱码）
+    {
+        QString s = QString::fromLocal8Bit(raw);
+        // 若本地编码转换后无替换字符，认为可用
+        if (!s.contains(QChar(0xFFFD)))
+            return s;
     }
-#else
-    // Linux/macOS 下用 iconv
-    // 简化：用 QString::fromLocal8Bit 兜底（locale 通常是 UTF-8，GBK 会乱码）
-    // 生产环境建议引入 iconv 或 Qt5Compat
-#endif
 
     // 最后兜底
     return QString::fromLatin1(raw);

@@ -128,13 +128,14 @@ void SpeedPointDialog::onRefresh()
 
 void SpeedPointDialog::runFinder()
 {
+    QSignalBlocker blocker(m_candidateList);
     m_candidateList->clear();
 
     SpeedPointFinderConfig cfg;
     cfg.marker = m_markerEdit->text();
     if (cfg.marker.isEmpty()) cfg.marker = "：";
-    // 处理 \n 转义
-    cfg.marker.replace("\\n", "\n");
+    // 仅将字面 "\n" 替换为真实换行，不破坏其他正则元字符
+    cfg.marker.replace(QStringLiteral("\\n"), QStringLiteral("\n"));
     cfg.prefixLength = m_prefixSpin->value();
     cfg.maxPoints = m_maxSpin->value();
 
@@ -166,6 +167,9 @@ void SpeedPointDialog::runFinder()
 
 void SpeedPointDialog::onSelectionChanged()
 {
+    // 防止 setFlags 再次触发 itemChanged 造成无限递归
+    QSignalBlocker blocker(m_candidateList);
+    
     int checked = 0;
     for (int i = 0; i < m_candidateList->count(); ++i) {
         if (m_candidateList->item(i)->checkState() == Qt::Checked)
@@ -194,6 +198,7 @@ void SpeedPointDialog::onAccept()
     m_selectedPoints.clear();
     for (int i = 0; i < m_candidateList->count(); ++i) {
         auto* it = m_candidateList->item(i);
+        if (!it) continue;
         if (it->checkState() == Qt::Checked) {
             m_selectedPoints.append(it->data(Qt::UserRole).toInt());
         }

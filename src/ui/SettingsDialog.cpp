@@ -4,6 +4,7 @@
 #include "app/ConfigManager.h"
 #include "theme/ThemeManager.h"
 
+#include <QApplication>
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QFormLayout>
@@ -430,7 +431,7 @@ void SettingsDialog::onCancel()
     // ---- 恢复字体 ----
     QFont f = m_originalFont;
     if (f.family().isEmpty()) {
-        // 原始为空，用系统默认
+        f = QApplication::font();
         f.setPointSize(18);
     }
     emit fontPreview(f);

@@ -28,6 +28,9 @@ TextLibraryDialog::TextLibraryDialog(QWidget* parent)
     resize(860, 560);
     setupUi();
     loadTextList();
+
+    connect(&ThemeManager::instance(), &ThemeManager::themeChanged,
+            this, [this] { loadTextList(); });
 }
 
 void TextLibraryDialog::setupUi()
@@ -180,8 +183,16 @@ void TextLibraryDialog::addTextItem(const QString& displayName,
     // 用户文本附加字数与修改时间
     if (!isResource) {
         QFileInfo fi(fullPath);
-        QString preview = TextLoader::loadFile(fullPath);
-        int len = preview.length();
+        // 仅读取前 8KB 估算字数，避免全量加载大文件
+        QFile f(fullPath);
+        int len = 0;
+        if (f.open(QIODevice::ReadOnly)) {
+            QByteArray head = f.read(8192);
+            bool truncated = (head.size() == 8192);
+            QString s = TextLoader::decode(head);
+            len = s.length();
+            if (truncated) len = int(len * (double(fi.size()) / head.size()));
+        }
         item->setText(QString("%1  (%2 字 · %3)")
             .arg(displayName)
             .arg(len)
@@ -205,6 +216,20 @@ void TextLibraryDialog::onSearchChanged(const QString& keyword)
         const bool match = keyword.isEmpty() ||
                            item->text().contains(keyword, Qt::CaseInsensitive);
         item->setHidden(!match);
+    }
+
+    // 搜索后若没有任何可选条目，提示用户
+    if (!keyword.isEmpty()) {
+        bool anyVisible = false;
+        for (int i = 0; i < m_listWidget->count(); ++i) {
+            auto* it = m_listWidget->item(i);
+            if (it->flags() != Qt::NoItemFlags && !it->isHidden()) {
+                anyVisible = true;
+                break;
+            }
+        }
+        if (!anyVisible)
+            m_statusLabel->setText(tr("没有匹配 \"%1\" 的文本").arg(keyword));
     }
 }
 

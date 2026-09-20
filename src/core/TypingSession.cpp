@@ -15,7 +15,7 @@ void TypingSession::start(const QString& targetText)
 void TypingSession::startFrom(const QString& targetText, int startIndex)
 {
     m_target = targetText;
-    m_initialStartIndex = qBound(0, startIndex, targetText.length());
+    m_initialStartIndex = qBound(0, startIndex, qMax(0, targetText.length() - 1));
     m_currentIndex = m_initialStartIndex;
     m_keystrokes = 0;
     m_errorChars = 0;
@@ -82,17 +82,22 @@ bool TypingSession::inputCharacter(QChar ch)
     if (m_state != Running) return false;
     if (m_currentIndex >= m_target.length()) return false;
 
-    // 自动跳过换行符
+    // 先跳过换行，再判断是否已完成
     while (m_currentIndex < m_target.length() &&
            m_target.at(m_currentIndex) == '\n') {
         ++m_currentIndex;
     }
     if (m_currentIndex >= m_target.length()) {
-        m_state = Finished;
-        emit stateChanged(m_state);
-        emit finished();
+        if (m_state != Finished) {
+            m_state = Finished;
+            m_pausedElapsed += m_timer.elapsed();
+            emit stateChanged(m_state);
+            emit finished();
+        }
         return false;
     }
+    // 跳过后再判定能否接受输入
+    if (m_state != Running) return false;
 
     ++m_keystrokes;
     const QChar expected = m_target.at(m_currentIndex);
@@ -109,6 +114,7 @@ bool TypingSession::inputCharacter(QChar ch)
         if (probe >= m_target.length()) {
             m_currentIndex = probe;
             m_state = Finished;
+            m_pausedElapsed += m_timer.elapsed();
             emit stateChanged(m_state);
             emit finished();
         }
@@ -135,6 +141,7 @@ bool TypingSession::backspace()
     ++m_backspaces;
     if (m_state == Finished) {
         m_state = Running;
+        m_timer.restart();
         emit stateChanged(m_state);
     }
     emit positionChanged(m_currentIndex, true);

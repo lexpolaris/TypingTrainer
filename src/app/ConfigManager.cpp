@@ -30,7 +30,9 @@ void ConfigManager::load()
             {"general", QJsonObject{
                 {"themeMode", "system"},
                 {"fontFamily", ""},
-                {"fontPointSize", 16}
+                {"fontPointSize", 16},
+                {"fontBold", false},
+                {"fontItalic", false}
             }},
             {"typing", QJsonObject{
                 {"currentCodeTable", "wubi86"},
@@ -46,6 +48,10 @@ void ConfigManager::load()
     QJsonDocument doc = QJsonDocument::fromJson(f.readAll(), &err);
     if (err.error != QJsonParseError::NoError) {
         qWarning() << "Config parse error:" << err.errorString();
+        return;
+    }
+    if (!doc.isObject()) {
+        qWarning() << "Config root is not an object, using defaults";
         return;
     }
     m_root = doc.object();
@@ -78,17 +84,6 @@ void ConfigManager::set(const QString& key, const QVariant& value)
     QStringList parts = key.split('.', Qt::SkipEmptyParts);
     if (parts.isEmpty()) return;
 
-    // 逐层创建
-    QJsonObject* cur = &m_root;
-    for (int i = 0; i < parts.size() - 1; ++i) {
-        QJsonValue v = cur->value(parts[i]);
-        if (!v.isObject()) {
-            cur->insert(parts[i], QJsonObject{});
-        }
-        // 注意：这里需要引用，不能拷贝
-        // 简化写法：重新构建
-    }
-    // 用更简单的方式：递归 set
     std::function<void(QJsonObject&, const QStringList&, const QVariant&)> rec =
         [&](QJsonObject& obj, const QStringList& keys, const QVariant& val) {
         if (keys.size() == 1) {
@@ -145,7 +140,7 @@ void ConfigManager::setCustomThemeColors(const QHash<int, QColor>& colors)
 {
     QJsonObject obj;
     for (auto it = colors.begin(); it != colors.end(); ++it) {
-        obj.insert(QString::number(it.key()), it.value().name());
+        obj.insert(QString::number(it.key()), it.value().name(QColor::HexArgb));
     }
     set("theme.customColors", obj);
 }
@@ -153,17 +148,17 @@ void ConfigManager::setCustomThemeColors(const QHash<int, QColor>& colors)
 QFont ConfigManager::typingFont() const
 {
     QFont f;
-    f.setFamily(get("font.family", "").toString());
-    f.setPointSize(get("font.pointSize", 18).toInt());
-    f.setBold(get("font.bold", false).toBool());
-    f.setItalic(get("font.italic", false).toBool());
+    f.setFamily(get("general.fontFamily", "").toString());
+    f.setPointSize(get("general.fontPointSize", 18).toInt());
+    f.setBold(get("general.fontBold", false).toBool());
+    f.setItalic(get("general.fontItalic", false).toBool());
     return f;
 }
 
 void ConfigManager::setTypingFont(const QFont& f)
 {
-    set("font.family", f.family());
-    set("font.pointSize", f.pointSize());
-    set("font.bold", f.bold());
-    set("font.italic", f.italic());
+    set("general.fontFamily", f.family());
+    set("general.fontPointSize", f.pointSize());
+    set("general.fontBold", f.bold());
+    set("general.fontItalic", f.italic());
 }

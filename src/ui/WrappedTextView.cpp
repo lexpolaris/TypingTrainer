@@ -98,6 +98,16 @@ void WrappedTextView::ensureCursorVisible(int currentIndex)
         if (currentIndex >= last.startIndex)
             targetLine = m_lines.size() - 1;
     }
+    // 光标落在硬换行符上：定位到其后第一个视觉行（或最后一行）
+    if (targetLine < 0) {
+        for (int i = 0; i < m_lines.size(); ++i) {
+            if (m_lines[i].startIndex >= currentIndex) {
+                targetLine = i;
+                break;
+            }
+        }
+        if (targetLine < 0) targetLine = m_lines.size() - 1;
+    }
     if (targetLine < 0) return;
 
     QFontMetrics fm(m_font);

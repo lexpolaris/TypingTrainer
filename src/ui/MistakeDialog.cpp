@@ -147,14 +147,13 @@ void MistakeDialog::updatePreview(int row)
     const auto& m = m_mistakes[row];
 
     // 高亮显示上下文
-    QString ctx = contextAround(m.position, 12);
+    const int preStart = qMax(0, m.position - 12);
+    const int preLen = m.position - preStart;
     QString html = QString(
-        "<span style='color:%1'>%2</span>"
-        "<span style='background:#FFD54F; color:#000; font-weight:bold;'>%3</span>"
-        "<span style='color:%1'>%4</span>")
-        .arg("#888")
-        .arg(m_targetText.mid(qMax(0, m.position - 12),
-                              m.position - qMax(0, m.position - 12)).toHtmlEscaped())
+        "<span style='color:#888'>%1</span>"
+        "<span style='background:#FFD54F; color:#000; font-weight:bold;'>%2</span>"
+        "<span style='color:#888'>%3</span>")
+        .arg(m_targetText.mid(preStart, preLen).toHtmlEscaped())
         .arg(QString(m.expected).toHtmlEscaped())
         .arg(m_targetText.mid(m.position + 1, 12).toHtmlEscaped());
 

@@ -63,7 +63,10 @@ public:
     int    totalKeystrokes() const { return m_keystrokes; }
     int    errorChars() const { return m_errorChars; }
     int    backspaceCount() const { return m_backspaces; }
-    int    correctChars() const { return m_currentIndex - m_errorChars; }
+    int    correctChars() const {
+        int net = m_currentIndex - m_initialStartIndex;
+        return net > m_errorChars ? net - m_errorChars : 0;
+    }
 
     double speedCPM() const;
     double keystrokePerSec() const;

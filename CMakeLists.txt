@@ -13,15 +13,6 @@ endif()
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets Core Gui Charts)
 
-# 可选：图表、数据库（后续阶段启用）
-find_package(Qt6 COMPONENTS Charts Sql QUIET)
-if(Qt6Charts_FOUND)
-    message(STATUS "QtCharts found, statistics chart enabled")
-endif()
-if(Qt6Sql_FOUND)
-    message(STATUS "QtSql found, history DB enabled")
-endif()
-
 set(SOURCES
     src/main.cpp
     src/app/Application.cpp

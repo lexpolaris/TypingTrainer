@@ -2,6 +2,8 @@
 
 #include <QRegularExpression>
 #include <QtMath>
+#include <algorithm>
+
 
 QVector<SpeedPointCandidate> SpeedPointFinder::find(
     const QString& text,
@@ -59,7 +61,8 @@ QVector<SpeedPointCandidate> SpeedPointFinder::find(
         int need = cfg.maxPoints - result.size();
         QVector<int> extra = fillEvenly(text.length(), need, usedIndices,
                                         cfg.minDistance);
-        for (int idx : extra) {
+         if (extra.size() > need) extra.resize(need);
+         for (int idx : extra) {
             SpeedPointCandidate c;
             c.index = idx;
             c.prefix = text.mid(qMax(0, idx - cfg.prefixLength),
@@ -89,7 +92,7 @@ QVector<int> SpeedPointFinder::fillEvenly(
     // 把全文按 count+1 等分，取每个分割点
     for (int i = 1; i <= count; ++i) {
         int pos = textLength * i / (count + 1);
-        pos = qBound(1, pos, textLength - 1);
+        pos = qBound(1, pos, qMax(1, textLength - 1));
 
         // 检查是否与已有的太近
         bool tooClose = false;

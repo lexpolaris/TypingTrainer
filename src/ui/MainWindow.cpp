@@ -185,14 +185,17 @@ void MainWindow::setupMenus()
     connect(actSys, &QAction::triggered, this, [=] {
         ThemeManager::instance().setMode(ThemeManager::System);
         updateChecks(ThemeManager::System);
+        saveConfigFromUi();
     });
     connect(actLight, &QAction::triggered, this, [=] {
         ThemeManager::instance().setMode(ThemeManager::Light);
         updateChecks(ThemeManager::Light);
+        saveConfigFromUi();
     });
     connect(actDark, &QAction::triggered, this, [=] {
         ThemeManager::instance().setMode(ThemeManager::Dark);
         updateChecks(ThemeManager::Dark);
+        saveConfigFromUi();
     });
 
     themeMenu->addSeparator();
@@ -221,6 +224,13 @@ void MainWindow::setupStatusBar()
     statusBar()->addPermanentWidget(m_statusCode);
     statusBar()->addPermanentWidget(m_statusStats);
     statusBar()->addPermanentWidget(m_statusMistakes);
+
+    connect(&ThemeManager::instance(), &ThemeManager::themeChanged,
+            this, [this] {
+        m_statusMistakes->setStyleSheet(QString("color: %1;")
+            .arg(ThemeManager::instance().color(ThemeManager::Error).name()));
+    });
+    
     updateStats();
 }
 
@@ -357,7 +367,8 @@ void MainWindow::switchMode(bool pacman)
 
     auto* central = centralWidget();
     auto* layout = qobject_cast<QVBoxLayout*>(central->layout());
-    layout->replaceWidget(m_view, newView);
+    QLayoutItem* oldItem = layout->replaceWidget(m_view, newView);
+    delete oldItem;
 
     TypingView* old = m_view;
     m_view = newView;
@@ -433,6 +444,14 @@ void MainWindow::onSpeedPointSettings()
     }
 
     QVector<int> pts = dlg.selectedPoints();
+    // 若会话已开始，重设测速点需要重置会话统计
+    if (m_session->currentIndex() > m_session->initialStartIndex()) {
+        auto ret = QMessageBox::question(this, tr("测速点"),
+            tr("重设测速点会重置当前统计，是否继续？"),
+            QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+        if (ret != QMessageBox::Yes) { ensureViewFocus(); return; }
+        m_session->startFrom(m_doc->text(), m_session->initialStartIndex());
+    }
     m_session->setSpeedPoints(pts);
     statusBar()->showMessage(tr("已设置 %1 个测速点").arg(pts.size()), 3000);
     ensureViewFocus();
