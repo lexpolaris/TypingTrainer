@@ -1,33 +1,52 @@
 // src/core/TypingSession.cpp
 #include "TypingSession.h"
+#include <algorithm>
 
 TypingSession::TypingSession(QObject* parent) : QObject(parent) {}
 
+// ---------------------------------------------------------------
+// 开始 / 重置
+// ---------------------------------------------------------------
 void TypingSession::start(const QString& targetText)
 {
+    startFrom(targetText, 0);
+}
+
+void TypingSession::startFrom(const QString& targetText, int startIndex)
+{
     m_target = targetText;
-    m_currentIndex = 0;
+    m_initialStartIndex = qBound(0, startIndex, targetText.length());
+    m_currentIndex = m_initialStartIndex;
     m_keystrokes = 0;
     m_errorChars = 0;
     m_backspaces = 0;
     m_snapshots.clear();
     m_hitSpeedPoints.clear();
+    m_mistakes.clear();
     m_pausedElapsed = 0;
     m_state = Running;
     m_timer.start();
     emit stateChanged(m_state);
-    emit positionChanged(0, true);
+    emit positionChanged(m_currentIndex, true);
+}
+
+void TypingSession::retry()
+{
+    if (m_target.isEmpty()) return;
+    startFrom(m_target, m_initialStartIndex);
 }
 
 void TypingSession::reset()
 {
     m_state = Idle;
     m_currentIndex = 0;
+    m_initialStartIndex = 0;
     m_keystrokes = 0;
     m_errorChars = 0;
     m_backspaces = 0;
     m_snapshots.clear();
     m_hitSpeedPoints.clear();
+    m_mistakes.clear();
     emit stateChanged(m_state);
     emit positionChanged(0, true);
 }
@@ -55,19 +74,40 @@ double TypingSession::elapsedSeconds() const
     return ms / 1000.0;
 }
 
+// ---------------------------------------------------------------
+// 输入
+// ---------------------------------------------------------------
 bool TypingSession::inputCharacter(QChar ch)
 {
     if (m_state != Running) return false;
     if (m_currentIndex >= m_target.length()) return false;
 
+    // 自动跳过换行符
+    while (m_currentIndex < m_target.length() &&
+           m_target.at(m_currentIndex) == '\n') {
+        ++m_currentIndex;
+    }
+    if (m_currentIndex >= m_target.length()) {
+        m_state = Finished;
+        emit stateChanged(m_state);
+        emit finished();
+        return false;
+    }
+
     ++m_keystrokes;
-    QChar expected = m_target.at(m_currentIndex);
+    const QChar expected = m_target.at(m_currentIndex);
 
     if (ch == expected) {
         ++m_currentIndex;
         checkSpeedPoint();
         emit positionChanged(m_currentIndex - 1, true);
-        if (m_currentIndex >= m_target.length()) {
+
+        // 检查末尾
+        int probe = m_currentIndex;
+        while (probe < m_target.length() && m_target.at(probe) == '\n')
+            ++probe;
+        if (probe >= m_target.length()) {
+            m_currentIndex = probe;
             m_state = Finished;
             emit stateChanged(m_state);
             emit finished();
@@ -75,6 +115,7 @@ bool TypingSession::inputCharacter(QChar ch)
         return true;
     } else {
         ++m_errorChars;
+        recordMistake(m_currentIndex, expected, ch);
         emit positionChanged(m_currentIndex, false);
         return false;
     }
@@ -82,10 +123,20 @@ bool TypingSession::inputCharacter(QChar ch)
 
 bool TypingSession::backspace()
 {
-    if (m_state != Running) return false;
-    if (m_currentIndex <= 0) return false;
+    if (m_state == Idle) return false;
+    if (m_currentIndex <= m_initialStartIndex) return false;
+
     --m_currentIndex;
+    while (m_currentIndex > m_initialStartIndex &&
+           m_target.at(m_currentIndex) == '\n') {
+        --m_currentIndex;
+    }
+
     ++m_backspaces;
+    if (m_state == Finished) {
+        m_state = Running;
+        emit stateChanged(m_state);
+    }
     emit positionChanged(m_currentIndex, true);
     return true;
 }
@@ -97,6 +148,33 @@ void TypingSession::skipToPosition(int pos)
     emit positionChanged(m_currentIndex, true);
 }
 
+// ---------------------------------------------------------------
+// 错字记录
+// ---------------------------------------------------------------
+void TypingSession::recordMistake(int position, QChar expected, QChar actual)
+{
+    // 查找该位置是否已有记录
+    for (auto& m : m_mistakes) {
+        if (m.position == position) {
+            ++m.count;
+            m.actual = actual;
+            emit mistakeAdded(position);
+            return;
+        }
+    }
+    // 新记录
+    MistakeRecord m;
+    m.position = position;
+    m.expected = expected;
+    m.actual = actual;
+    m.count = 1;
+    m_mistakes.append(m);
+    emit mistakeAdded(position);
+}
+
+// ---------------------------------------------------------------
+// 测速点
+// ---------------------------------------------------------------
 void TypingSession::setSpeedPoints(const QVector<int>& positions)
 {
     m_speedPoints = positions;
@@ -118,6 +196,9 @@ void TypingSession::checkSpeedPoint()
     });
 }
 
+// ---------------------------------------------------------------
+// 统计
+// ---------------------------------------------------------------
 double TypingSession::speedCPM() const
 {
     double sec = elapsedSeconds();

@@ -96,6 +96,20 @@ void TypingView::keyPressEvent(QKeyEvent* e)
         return;
     }
 
+    // F3：重打当前段
+    if (e->key() == Qt::Key_F3) {
+        emit requestRetry();
+        e->accept();
+        return;
+    }
+
+    // Enter：下一段
+    if (e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter) {
+        emit requestNextParagraph();
+        e->accept();
+        return;
+    }
+
     // 忽略纯修饰键
     switch (e->key()) {
     case Qt::Key_Shift:

@@ -34,6 +34,8 @@ public slots:
 signals:
     void codeHintRequested(QChar current, QChar next);
     void codeHintCleared();   // 打对时清除提示
+    void requestRetry();           // F3
+    void requestNextParagraph();   // Enter
 
 protected:
     // ---------------- 键盘输入 ----------------

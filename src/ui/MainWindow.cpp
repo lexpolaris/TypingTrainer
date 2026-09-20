@@ -8,6 +8,7 @@
 #include "SpeedPointDialog.h"
 #include "SpeedChartDialog.h"
 #include "SettingsDialog.h"
+#include "MistakeDialog.h"
 
 #include "core/TextDocument.h"
 #include "core/TypingSession.h"
@@ -45,6 +46,8 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
             this, &MainWindow::updateStats);
     connect(m_session, &TypingSession::stateChanged,
             this, [this](TypingSession::State) { updateStats(); });
+    connect(m_session, &TypingSession::mistakeAdded,
+            this, [this](int) { updateStats(); });
 
     applyConfigToUi();
 
@@ -84,6 +87,10 @@ void MainWindow::setupUi()
             this, &MainWindow::onCodeHintRequested);
     connect(m_view, &TypingView::codeHintCleared,
             m_codeHint, &CodeHintPanel::clear);
+    connect(m_view, &TypingView::requestRetry,
+            this, &MainWindow::onRetry);
+    connect(m_view, &TypingView::requestNextParagraph,
+            this, &MainWindow::onNextParagraph);
 }
 
 void MainWindow::ensureViewFocus()
@@ -127,6 +134,16 @@ void MainWindow::setupMenus()
     modeGroup->addAction(actTwoLine);
     connect(actTwoLine, &QAction::triggered,
             this, &MainWindow::onSwitchModeTwoLine);
+    
+    // ---------- 跟打 ----------
+    auto* typeMenu = menuBar()->addMenu(tr("跟打(&T)"));
+    typeMenu->addAction(tr("重打当前段"), QKeySequence("F3"),
+                        this, &MainWindow::onRetry);
+    typeMenu->addAction(tr("下一段"), QKeySequence("Return"),
+                        this, &MainWindow::onNextParagraph);
+    typeMenu->addSeparator();
+    typeMenu->addAction(tr("错字列表..."), QKeySequence("Ctrl+M"),
+                        this, &MainWindow::onShowMistakes);
 
     // ---------- 码表 ----------
     auto* codeMenu = menuBar()->addMenu(tr("码表(&C)"));
@@ -194,10 +211,16 @@ void MainWindow::setupStatusBar()
     m_statusKey      = new QLabel(this);
     m_statusCode     = new QLabel(this);
     m_statusProgress = new QLabel(this);
+    m_statusStats    = new QLabel(this);
+    m_statusMistakes = new QLabel(this);
+    m_statusMistakes->setStyleSheet("color: palette(bright-text);");
+
     statusBar()->addWidget(m_statusProgress, 1);
     statusBar()->addPermanentWidget(m_statusSpeed);
     statusBar()->addPermanentWidget(m_statusKey);
     statusBar()->addPermanentWidget(m_statusCode);
+    statusBar()->addPermanentWidget(m_statusStats);
+    statusBar()->addPermanentWidget(m_statusMistakes);
     updateStats();
 }
 
@@ -294,12 +317,7 @@ void MainWindow::loadText(const QString& path)
         QMessageBox::warning(this, tr("打开失败"), err);
         return;
     }
-    m_session->start(m_doc->text());
-    setWindowTitle(tr("打字练习 - %1").arg(m_doc->name()));
-    m_view->setDocument(m_doc);
-    m_view->update();
-    updateStats();
-    ensureViewFocus();
+    jumpToParagraph(0);
 }
 
 void MainWindow::loadResourceText(const QString& resPath)
@@ -311,12 +329,7 @@ void MainWindow::loadResourceText(const QString& resPath)
         return;
     }
     m_doc->loadFromString(text, QFileInfo(resPath).fileName());
-    m_session->start(text);
-    setWindowTitle(tr("打字练习 - %1").arg(m_doc->name()));
-    m_view->setDocument(m_doc);
-    m_view->update();
-    updateStats();
-    ensureViewFocus();
+    jumpToParagraph(0);
 }
 
 // ---------------------------------------------------------------
@@ -465,15 +478,105 @@ void MainWindow::onCodeHintRequested(QChar current, QChar next)
 void MainWindow::updateStats()
 {
     if (!m_session) return;
-    m_statusSpeed->setText(tr("速度: %1 字/分")
-        .arg(m_session->speedCPM(), 0, 'f', 1));
-    m_statusKey->setText(tr("击键: %1  码长: %2")
-        .arg(m_session->keystrokePerSec(), 0, 'f', 1)
-        .arg(m_session->codeLength(), 0, 'f', 2));
-    m_statusCode->setText(tr("错字: %1  回改: %2")
-        .arg(m_session->errorChars())
-        .arg(m_session->backspaceCount()));
+
     m_statusProgress->setText(tr("进度: %1 / %2")
         .arg(m_session->currentIndex())
         .arg(m_session->totalLength()));
+
+    m_statusStats->setText(
+        tr("速度 %1 字/分  ·  击键 %2  ·  码长 %3  ·  错字 %4  ·  回改 %5")
+            .arg(m_session->speedCPM(), 0, 'f', 1)
+            .arg(m_session->keystrokePerSec(), 0, 'f', 1)
+            .arg(m_session->codeLength(), 0, 'f', 2)
+            .arg(m_session->errorChars())
+            .arg(m_session->backspaceCount()));
+
+    int mistakeCount = m_session->mistakeCount();
+    m_statusMistakes->setText(
+        mistakeCount > 0 ? tr("错字位置 %1 (Ctrl+M)").arg(mistakeCount)
+                         : QString());
+}
+
+// ---------------------------------------------------------------
+// 段落导航
+// ---------------------------------------------------------------
+int MainWindow::currentParagraphIndex() const
+{
+    if (!m_doc || !m_session) return 0;
+    const auto& paras = m_doc->paragraphs();
+    if (paras.isEmpty()) return 0;
+
+    int idx = m_session->currentIndex();
+    for (int i = 0; i < paras.size(); ++i) {
+        int start = paras[i].startIndex;
+        int end = start + paras[i].length;
+        if (idx >= start && idx < end) return i;
+    }
+    return paras.size() - 1;
+}
+
+void MainWindow::jumpToParagraph(int index)
+{
+    if (!m_doc || !m_session) return;
+    const auto& paras = m_doc->paragraphs();
+    if (index < 0 || index >= paras.size()) return;
+
+    int start = paras[index].startIndex;
+    m_session->startFrom(m_doc->text(), start);
+
+    setWindowTitle(tr("打字练习 - %1 [第 %2/%3 段]")
+        .arg(m_doc->name())
+        .arg(index + 1)
+        .arg(paras.size()));
+
+    m_view->setDocument(m_doc);
+    m_view->update();
+    updateStats();
+    ensureViewFocus();
+}
+
+void MainWindow::onRetry()
+{
+    if (!m_session || m_session->target().isEmpty()) return;
+    m_session->retry();
+    updateStats();
+    ensureViewFocus();
+}
+
+void MainWindow::onNextParagraph()
+{
+    if (!m_doc || !m_session) return;
+    const auto& paras = m_doc->paragraphs();
+    int cur = currentParagraphIndex();
+    if (cur + 1 >= paras.size()) {
+        statusBar()->showMessage(tr("已经是最后一段"), 2000);
+        return;
+    }
+    jumpToParagraph(cur + 1);
+}
+
+// ---------------------------------------------------------------
+// 错字列表
+// ---------------------------------------------------------------
+void MainWindow::onShowMistakes()
+{
+    if (!m_session) return;
+
+    const auto& mistakes = m_session->mistakes();
+    if (mistakes.isEmpty()) {
+        QMessageBox::information(this, tr("错字列表"),
+            tr("没有错字记录。"));
+        ensureViewFocus();
+        return;
+    }
+
+    MistakeDialog dlg(mistakes, m_session->target(), this);
+    connect(&dlg, &MistakeDialog::jumpRequested,
+            this, [this](int pos) {
+        m_session->skipToPosition(pos);
+        m_view->update();
+        updateStats();
+    });
+    dlg.exec();
+    ensureViewFocus();
 }

@@ -1,5 +1,6 @@
 // src/core/TypingSession.h
 #pragma once
+
 #include <QObject>
 #include <QString>
 #include <QElapsedTimer>
@@ -14,6 +15,15 @@ struct SpeedPointSnapshot
     int    backspaces = 0;
 };
 
+/// 错字记录
+struct MistakeRecord
+{
+    int     position = 0;     // 字符位置
+    QChar   expected;         // 期望字符
+    QChar   actual;           // 最近一次的错误输入
+    int     count = 0;        // 累计错误次数
+};
+
 class TypingSession : public QObject
 {
     Q_OBJECT
@@ -23,17 +33,28 @@ public:
 
     explicit TypingSession(QObject* parent = nullptr);
 
+    /// 从头开始
     void start(const QString& targetText);
+
+    /// 从指定位置开始（用于跳段）
+    void startFrom(const QString& targetText, int startIndex);
+
+    /// 重打当前段（回到 m_initialStartIndex）
+    void retry();
+
     void reset();
     void pause();
     void resume();
 
     bool inputCharacter(QChar ch);
     bool backspace();
+
+    /// 跳转光标位置（不重置统计）
     void skipToPosition(int pos);
 
     State state() const { return m_state; }
     int currentIndex() const { return m_currentIndex; }
+    int initialStartIndex() const { return m_initialStartIndex; }
     int totalLength() const { return m_target.length(); }
     const QString& target() const { return m_target; }
 
@@ -48,6 +69,10 @@ public:
     double keystrokePerSec() const;
     double codeLength() const;
 
+    // 错字
+    const QVector<MistakeRecord>& mistakes() const { return m_mistakes; }
+    int mistakeCount() const { return m_mistakes.size(); }
+
     // 测速点
     void setSpeedPoints(const QVector<int>& positions);
     const QVector<SpeedPointSnapshot>& snapshots() const { return m_snapshots; }
@@ -56,12 +81,15 @@ signals:
     void positionChanged(int index, bool correct);
     void stateChanged(State s);
     void finished();
+    void mistakeAdded(int position);   // 新错字 / 已有错字 count 增加
 
 private:
     void checkSpeedPoint();
+    void recordMistake(int position, QChar expected, QChar actual);
 
     QString m_target;
     int     m_currentIndex = 0;
+    int     m_initialStartIndex = 0;   // 供 retry 使用
     int     m_keystrokes = 0;
     int     m_errorChars = 0;
     int     m_backspaces = 0;
@@ -72,4 +100,5 @@ private:
     QVector<int> m_speedPoints;
     QVector<SpeedPointSnapshot> m_snapshots;
     QSet<int> m_hitSpeedPoints;
+    QVector<MistakeRecord> m_mistakes;
 };

@@ -28,6 +28,9 @@ private slots:
     void onCodeHintRequested(QChar current, QChar next);
     void updateStats();
     void onOpenSettings();
+    void onRetry();                     // F3
+    void onNextParagraph();             // Enter
+    void onShowMistakes();              // 错字列表
 
 private:
     void setupUi();
@@ -42,6 +45,13 @@ private:
     void startSessionForText(const QString& targetText, const QString& name);
     void ensureViewFocus();
 
+    // 当前光标所在段落的索引
+    int currentParagraphIndex() const;
+
+    // 从指定段落开始跟打
+    void jumpToParagraph(int index);
+
+
     // 数据
     TextDocument*  m_doc = nullptr;
     TypingSession* m_session = nullptr;
@@ -54,6 +64,8 @@ private:
     QLabel*        m_statusKey = nullptr;
     QLabel*        m_statusCode = nullptr;
     QLabel*        m_statusProgress = nullptr;
+    QLabel*        m_statusStats = nullptr;
+    QLabel*        m_statusMistakes = nullptr;
 
     void applyTypingFont(const QFont& f);
     QFont m_currentTypingFont;
