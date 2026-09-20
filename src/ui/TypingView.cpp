@@ -163,6 +163,32 @@ void TypingView::inputMethodEvent(QInputMethodEvent* e)
     e->accept();
 }
 
+QVariant TypingView::inputMethodQuery(Qt::InputMethodQuery query) const
+{
+    switch (query) {
+    case Qt::ImCursorRectangle:{
+        // 由子类提供当前光标的控件内坐标（屏幕坐标更稳）
+        QRect r = currentCursorRect();
+        if (!r.isValid()) return QVariant();
+        // 转成全局坐标，X11 输入法据此定位候选窗
+        QPoint tl = mapToGlobal(r.topLeft());
+        return QRect(tl, r.size());
+    }
+    case Qt::ImEnabled:
+        return true;
+    case Qt::ImHints:
+        return int(Qt::ImhNoPredictiveText | Qt::ImhNoAutoUppercase);
+    case Qt::ImSurroundingText:
+        return m_doc ? m_doc->text() : QString();
+    case Qt::ImCursorPosition:
+        return m_session ? m_session->currentIndex() : 0;
+    case Qt::ImAnchorPosition:
+        return m_session ? m_session->currentIndex() : 0;
+    default:
+        return QWidget::inputMethodQuery(query);
+    }
+}
+
 void TypingView::handleKeyInput(QChar ch)
 {
     if (!m_session) return;

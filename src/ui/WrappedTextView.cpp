@@ -134,6 +134,41 @@ int WrappedTextView::totalContentHeight() const
     return m_lines.last().y + visualLineHeight(fm);
 }
 
+QRect WrappedTextView::currentCursorRect() const
+{
+    if (!m_session || !m_doc || m_lines.isEmpty())
+        return {};
+
+    const int idx = m_session->currentIndex();
+    QFontMetrics fm(m_font);
+    const int lineH = visualLineHeight(fm);
+
+    // 找到包含 idx 的视觉行
+    int lineIdx = -1;
+    for (int i = 0; i < m_lines.size(); ++i) {
+        const auto& vl = m_lines[i];
+        if (idx >= vl.startIndex && idx < vl.startIndex + vl.length) {
+            lineIdx = i;
+            break;
+        }
+    }
+    if (lineIdx < 0) lineIdx = m_lines.size() - 1;
+
+    const auto& vl = m_lines[lineIdx];
+    // 计算本行内光标 x 偏移
+    const QString& text = m_doc->text();
+    int x = m_marginX;
+    for (int k = 0; k < vl.length; ++k) {
+        const int gi = vl.startIndex + k;
+        if (gi >= idx) break;
+        x += fm.horizontalAdvance(text.at(gi));
+    }
+    const int y = vl.y - m_scrollOffset + m_marginY;
+    const int cw = (idx < text.length())
+                       ? fm.horizontalAdvance(text.at(idx))
+                       : fm.horizontalAdvance(QChar(' '));
+    return QRect(x, y, qMax(1, cw), lineH);
+}
 // ---------------------------------------------------------------
 // 事件
 // ---------------------------------------------------------------

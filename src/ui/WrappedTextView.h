@@ -70,6 +70,9 @@ protected:
     /// 访问所有视觉行
     const QVector<VisualLine>& lines() const { return m_lines; }
 
+    /// 由视觉行布局计算当前光标的控件内矩形
+    QRect currentCursorRect() const override;
+
     /// 当前滚动偏移（像素）
     int scrollOffset() const { return m_scrollOffset; }
 

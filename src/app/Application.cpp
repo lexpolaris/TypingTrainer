@@ -8,7 +8,10 @@ Application::Application(int& argc, char** argv)
     : QApplication(argc, argv)
 {
     setApplicationName("TypingTrainer");
-    setOrganizationName("TypingTrainer");
+    // Linux 桌面惯例：不设置 organizationName，避免
+    // ~/.config/TypingTrainer/TypingTrainer 与
+    // ~/.local/share/TypingTrainer/TypingTrainer 的双层嵌套
+    // setOrganizationName("TypingTrainer");
     setApplicationVersion("0.1.0");
 
     AppPaths::ensureDirsExist();

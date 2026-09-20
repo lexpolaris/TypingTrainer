@@ -23,6 +23,9 @@ public:
     void setTypingFont(const QFont& f);
     QFont typingFont() const { return m_font; }
 
+    // 当前光标的控件内矩形（未映射到全局）；默认无效
+    virtual QRect currentCursorRect() const { return {}; }
+
 public slots:
     virtual void onPositionChanged(int index, bool correct)
     {
@@ -41,6 +44,9 @@ protected:
     // ---------------- 键盘输入 ----------------
     void keyPressEvent(QKeyEvent* e) override;
     void inputMethodEvent(QInputMethodEvent* e) override;
+
+    // ---------------- 输入法光标位置 ----------------
+    QVariant inputMethodQuery(Qt::InputMethodQuery query) const override;
 
     // ---------------- 焦点管理 ----------------
     void mousePressEvent(QMouseEvent* e) override;
