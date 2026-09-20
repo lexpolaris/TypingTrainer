@@ -115,24 +115,35 @@ void WrappedTextView::ensureCursorVisible(int currentIndex)
     const int lineHeight = visualLineHeight(fm);
     const int contentTop = m_lines[targetLine].y;
     const int contentBottom = contentTop + lineHeight;
-    const int viewTop = m_scrollOffset;
-    const int viewBottom = m_scrollOffset + height();
+
+    // 上下各预留一个 marginY
+    const int topPad = m_marginY;
+    const int bottomPad = m_marginY;
+    // 下方至少预留一行缓冲，确保下一行可见
+    const int lookAhead = lineHeight;
+    const int viewTop = m_scrollOffset + topPad;
+    const int viewBottom = m_scrollOffset + height() - bottomPad;
 
     if (contentTop < viewTop) {
-        // 向上滚动
-        m_scrollOffset = contentTop;
-    } else if (contentBottom > viewBottom) {
-        // 向下滚动，让本行底部贴合视图底部
-        m_scrollOffset = contentBottom - height();
+        m_scrollOffset = contentTop - topPad;
+    } else if (contentBottom + lookAhead > viewBottom) {
+        // 当前行 + 下一行缓冲 超出视口底部 → 提前滚动
+        // m_scrollOffset = contentBottom + lookAhead - height() + bottomPad;
+        // 让当前行位于视口高度 2/3 处，下方始终留出约 1/3 屏缓冲
+        const int targetY = height() * 2 / 3;
+        m_scrollOffset = contentTop + lineHeight / 2 - targetY;
     }
+
+    const int maxOffset = qMax(0, totalContentHeight() - height() + bottomPad);
     if (m_scrollOffset < 0) m_scrollOffset = 0;
+    if (m_scrollOffset > maxOffset) m_scrollOffset = maxOffset;
 }
 
 int WrappedTextView::totalContentHeight() const
 {
     if (m_lines.isEmpty()) return 0;
     QFontMetrics fm(m_font);
-    return m_lines.last().y + visualLineHeight(fm);
+    return m_lines.last().y + visualLineHeight(fm) + m_marginY;
 }
 
 QRect WrappedTextView::currentCursorRect() const

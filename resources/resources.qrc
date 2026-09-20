@@ -1,6 +1,16 @@
 <RCC>
     <qresource prefix="/">
+        <file>texts/常用字前500.txt</file>
+        <file>texts/常用字中500.txt</file>
+        <file>texts/常用字后500.txt</file>
         <file>texts/岳阳楼记.txt</file>
+        <file>texts/背影.txt</file>
+        <file>texts/断章.txt</file>
+        <file>texts/沙扬娜拉.txt</file>
+        <file>texts/致橡树.txt</file>
+        <file>texts/面朝大海，春暖花开.txt</file>
+        <file>texts/雨巷.txt</file>
+        <file>texts/再别康桥.txt</file>
     </qresource>
     <qresource prefix="/">
         <file>tables/wubi86.txt</file>
