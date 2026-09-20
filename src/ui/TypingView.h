@@ -34,6 +34,9 @@ public slots:
         update();
     }
 
+    /// 文本或字体变化时由子类重排；默认仅重绘
+    virtual void invalidateLayout() { update(); }
+
 signals:
     void codeHintRequested(QChar current, QChar next);
     void codeHintCleared();   // 打对时清除提示

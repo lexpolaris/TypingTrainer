@@ -9,6 +9,7 @@ bool TextDocument::loadFromFile(const QString& path, QString* error)
     m_name = QFileInfo(path).fileName();
     m_text = t;
     parseParagraphs();
+    emit contentChanged();
     return true;
 }
 
@@ -17,6 +18,7 @@ bool TextDocument::loadFromString(const QString& text, const QString& name)
     m_text = text;
     m_name = name;
     parseParagraphs();
+    emit contentChanged();
     return true;
 }
 

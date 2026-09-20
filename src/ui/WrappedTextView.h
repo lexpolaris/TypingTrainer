@@ -62,7 +62,7 @@ protected:
     // ---------------- 供子类使用的工具 ----------------
 
     /// 强制重新布局（子类修改 margin / spacing 后调用）
-    void invalidateLayout();
+    void invalidateLayout() override;
 
     /// 请求滚动到指定字符，使其可见
     void ensureCursorVisible(int currentIndex);

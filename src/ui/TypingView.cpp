@@ -54,7 +54,12 @@ void TypingView::setSession(TypingSession* s)
 
 void TypingView::setDocument(TextDocument* d)
 {
+    if (m_doc) m_doc->disconnect(this);
     m_doc = d;
+    if (m_doc) {
+        connect(m_doc, &TextDocument::contentChanged,
+                this, [this] { invalidateLayout(); });
+    }
     update();
 }
 

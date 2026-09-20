@@ -27,6 +27,9 @@ public:
     const QString& name() const { return m_name; }
     const QVector<Paragraph>& paragraphs() const { return m_paragraphs; }
 
+signals:
+    void contentChanged();
+    
 private:
     void parseParagraphs();
 

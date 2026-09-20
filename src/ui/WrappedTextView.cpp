@@ -72,6 +72,7 @@ void WrappedTextView::relayout()
 void WrappedTextView::invalidateLayout()
 {
     m_cachedWidth = -1;
+    m_cachedFont = QFont();
     update();
 }
 
