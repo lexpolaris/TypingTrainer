@@ -27,14 +27,17 @@ public:
     // ---- 字体 ----
     QFont typingFont() const;
     void setTypingFont(const QFont& f);
+    int     fontPointSize() const;
+    QString fontFamily() const;
 
     // ---- 其他 ----
     QString lastTextPath() const;
     QString currentCodeTable() const;
 
-    // 便捷
-    int     fontPointSize() const;
-    QString fontFamily() const;
+    // ---- 码表 ----
+    /// 启动时自动加载的码表路径（空表示不自动加载）
+    QString autoLoadCodeTablePath() const;
+    void setAutoLoadCodeTablePath(const QString& path);
 
 private:
     explicit ConfigManager(QObject* parent = nullptr);

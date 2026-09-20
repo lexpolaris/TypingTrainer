@@ -3,6 +3,7 @@
 
 #include "app/ConfigManager.h"
 #include "theme/ThemeManager.h"
+#include "utils/AppPaths.h"
 
 #include <QApplication>
 #include <QVBoxLayout>
@@ -22,6 +23,11 @@
 #include <QColorDialog>
 #include <QMessageBox>
 #include <QDialogButtonBox>
+#include <QLineEdit>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QFileDialog>
 
 SettingsDialog::SettingsDialog(QWidget* parent) : QDialog(parent)
 {
@@ -43,6 +49,7 @@ void SettingsDialog::setupUi()
     auto* tabs = new QTabWidget(this);
     tabs->addTab(buildFontPage(), tr("字体"));
     tabs->addTab(buildThemePage(), tr("主题"));
+    tabs->addTab(buildCodeTablePage(), tr("码表"));
     root->addWidget(tabs, 1);
 
     // 底部按钮
@@ -199,6 +206,73 @@ QWidget* SettingsDialog::buildThemePage()
     return page;
 }
 
+QWidget* SettingsDialog::buildCodeTablePage()
+{
+    auto* page = new QWidget(this);
+    auto* layout = new QVBoxLayout(page);
+
+    auto* box = new QGroupBox(tr("启动时自动加载的码表"), page);
+    auto* form = new QFormLayout(box);
+
+    auto* row = new QHBoxLayout();
+    m_codeTableCombo = new QComboBox(box);
+    m_codeTableCombo->setMinimumWidth(280);
+    m_codeTableImportBtn = new QPushButton(tr("导入..."), box);
+    m_codeTableClearBtn = new QPushButton(tr("不使用"), box);
+    row->addWidget(m_codeTableCombo, 1);
+    row->addWidget(m_codeTableImportBtn);
+    row->addWidget(m_codeTableClearBtn);
+    form->addRow(tr("码表:"), row);
+
+    auto* hint = new QLabel(
+        tr("内置码表随程序发布；"
+           "导入的码表保存在用户数据目录，下次启动自动出现在此列表中。"), box);
+    hint->setWordWrap(true);
+    hint->setForegroundRole(QPalette::PlaceholderText);
+    form->addRow(QString(), hint);
+
+    layout->addWidget(box);
+    layout->addStretch();
+
+    connect(m_codeTableImportBtn, &QPushButton::clicked, this, [this] {
+        QString path = QFileDialog::getOpenFileName(
+            this, tr("导入码表"), QDir::homePath(),
+            tr("码表 (*.txt *.mb);;所有文件 (*)"));
+        if (path.isEmpty()) return;
+
+        // 复制到用户码表目录
+        QFileInfo fi(path);
+        QString dest = AppPaths::codeTableDir() + "/" + fi.fileName();
+        if (QFile::exists(dest)) {
+            auto ret = QMessageBox::question(this, tr("导入码表"),
+                tr("\"%1\" 已存在，是否覆盖？").arg(fi.fileName()),
+                QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
+            if (ret != QMessageBox::Yes) return;
+            QFile::remove(dest);
+        }
+        if (!QFile::copy(path, dest)) {
+            QMessageBox::warning(this, tr("导入失败"),
+                tr("无法复制到: %1").arg(dest));
+            return;
+        }
+
+        reloadCodeTableList();
+        // 选中刚导入的
+        for (int i = 0; i < m_codeTableCombo->count(); ++i) {
+            if (m_codeTableCombo->itemData(i).toString() == dest) {
+                m_codeTableCombo->setCurrentIndex(i);
+                break;
+            }
+        }
+    });
+    connect(m_codeTableClearBtn, &QPushButton::clicked, this, [this] {
+        m_codeTableCombo->setCurrentIndex(0);   // "不使用" 项
+    });
+
+    reloadCodeTableList();
+    return page;
+}
+
 // ---------------------------------------------------------------
 // 加载配置
 // ---------------------------------------------------------------
@@ -248,6 +322,14 @@ void SettingsDialog::loadFromConfig()
     m_originalThemeMode = modeIdx;
     m_originalCustomColors = customColors;
 
+    const QString savedPath = cfg.autoLoadCodeTablePath();
+    for (int i = 0; i < m_codeTableCombo->count(); ++i) {
+        if (m_codeTableCombo->itemData(i).toString() == savedPath) {
+            m_codeTableCombo->setCurrentIndex(i);
+            break;
+        }
+    }
+
     // 触发一次预览
     emitFontPreview();
     emitThemePreview();
@@ -276,6 +358,9 @@ void SettingsDialog::saveToConfig()
 
     // 自定义颜色
     cfg.setCustomThemeColors(ThemeManager::instance().customColors());
+
+    // 码表
+    cfg.setAutoLoadCodeTablePath(m_codeTableCombo->currentData().toString());
 
     cfg.save();
 }
@@ -415,6 +500,51 @@ void SettingsDialog::emitThemePreview()
 
     // 同时把当前自定义颜色应用到全局
     emit themeColorsPreview(ThemeManager::instance().customColors());
+}
+
+// ---------------------------------------------------------------
+// 重载码表
+// ---------------------------------------------------------------
+void SettingsDialog::reloadCodeTableList()
+{
+    if (!m_codeTableCombo) return;
+
+    const QString prev = m_codeTableCombo->currentData().toString();
+    m_codeTableCombo->clear();
+
+    // 0 号项：不使用
+    m_codeTableCombo->addItem(tr("（不使用）"), QString());
+
+    // 1. 内置码表 :/tables/*.txt
+    QDir resDir(":/tables");
+    const auto resFiles = resDir.entryInfoList(
+        QStringList() << "*.txt" << "*.mb", QDir::Files, QDir::Name);
+    for (const QFileInfo& fi : resFiles) {
+        m_codeTableCombo->addItem(
+            tr("[内置] %1").arg(fi.completeBaseName()),
+            ":/tables/" + fi.fileName());
+    }
+
+    // 2. 用户码表 AppPaths::codeTableDir()
+    QDir userDir(AppPaths::codeTableDir());
+    const auto userFiles = userDir.entryInfoList(
+        QStringList() << "*.txt" << "*.mb", QDir::Files, QDir::Name);
+    for (const QFileInfo& fi : userFiles) {
+        m_codeTableCombo->addItem(
+            tr("[用户] %1").arg(fi.completeBaseName()),
+            fi.absoluteFilePath());
+    }
+
+    // 恢复之前的选择
+    if (!prev.isEmpty()) {
+        for (int i = 0; i < m_codeTableCombo->count(); ++i) {
+            if (m_codeTableCombo->itemData(i).toString() == prev) {
+                m_codeTableCombo->setCurrentIndex(i);
+                return;
+            }
+        }
+    }
+    m_codeTableCombo->setCurrentIndex(0);
 }
 
 // ---------------------------------------------------------------

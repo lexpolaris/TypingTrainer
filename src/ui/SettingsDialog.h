@@ -18,6 +18,7 @@ class QPlainTextEdit;
 class QComboBox;
 class QTableWidget;
 class QPushButton;
+class QLineEdit;
 
 class SettingsDialog : public QDialog
 {
@@ -50,9 +51,11 @@ private:
     void setupUi();
     QWidget* buildFontPage();
     QWidget* buildThemePage();
+    QWidget* buildCodeTablePage();
 
     void loadFromConfig();
     void saveToConfig();
+    void reloadCodeTableList();
 
     void emitFontPreview();
     void emitThemePreview();
@@ -75,4 +78,9 @@ private:
     QComboBox*       m_themeModeCombo = nullptr;
     QTableWidget*    m_colorTable = nullptr;
     QPushButton*     m_themeResetBtn = nullptr;
+
+    // ---- 码表页控件 ----
+    QComboBox*       m_codeTableCombo = nullptr;
+    QPushButton*     m_codeTableImportBtn = nullptr;
+    QPushButton*     m_codeTableClearBtn = nullptr;
 };

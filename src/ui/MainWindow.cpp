@@ -31,6 +31,7 @@
 #include <QWidget>
 #include <QLabel>
 #include <QTimer>
+#include <QColorDialog>
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
 {
@@ -53,6 +54,20 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
 
     // 加载内置示例文本
     loadResourceText(":/texts/岳阳楼记.txt");
+
+    // 启动时按配置自动加载码表
+    const QString autoTable = ConfigManager::instance().autoLoadCodeTablePath();
+    if (!autoTable.isEmpty()) {
+        QString err;
+        if (m_codeTable->loadFromFile(autoTable, &err)) {
+            m_view->setCodeTable(m_codeTable);
+            m_codeHint->setCodeTable(m_codeTable);
+            statusBar()->showMessage(
+                tr("已自动加载码表: %1").arg(m_codeTable->name()), 3000);
+        } else {
+            qWarning() << "自动加载码表失败:" << autoTable << err;
+        }
+    }
 
     // 启动后延迟聚焦视图，确保窗口已显示
     QTimer::singleShot(0, this, &MainWindow::ensureViewFocus);
@@ -200,11 +215,23 @@ void MainWindow::setupMenus()
 
     themeMenu->addSeparator();
     themeMenu->addAction(tr("自定义当前字符颜色..."), this, [this] {
-        QMessageBox::information(this, tr("提示"),
-            tr("自定义接口已就绪，可在 ThemeManager 中调用 setCustomColor()"));
+        const auto role = ThemeManager::Current;
+        QColor current = ThemeManager::instance().color(role);
+        QColor chosen = QColorDialog::getColor(
+            current, this, tr("选择当前字符颜色"));
+        if (!chosen.isValid()) return;
+
+        ThemeManager::instance().setCustomColor(role, chosen);
+
+        auto& cfg = ConfigManager::instance();
+        cfg.setCustomThemeColors(ThemeManager::instance().customColors());
+        cfg.save();
     });
     themeMenu->addAction(tr("清除所有自定义颜色"), this, [] {
         ThemeManager::instance().clearAllCustomColors();
+        ConfigManager::instance().setCustomThemeColors({});
+        ConfigManager::instance().save();
+        ThemeManager::instance().applyToApplication();
     });
 }
 
@@ -406,6 +433,8 @@ void MainWindow::loadBuiltinCodeTable(const QString& name)
     }
     m_view->setCodeTable(m_codeTable);
     m_codeHint->setCodeTable(m_codeTable);
+    ConfigManager::instance().setAutoLoadCodeTablePath(path);
+    ConfigManager::instance().save();
     statusBar()->showMessage(tr("已加载码表: %1").arg(m_codeTable->name()), 3000);
     ensureViewFocus();
 }
@@ -423,6 +452,15 @@ void MainWindow::onImportCodeTable()
     }
     m_view->setCodeTable(m_codeTable);
     m_codeHint->setCodeTable(m_codeTable);
+    // 若源文件不在用户码表目录，复制一份进去，便于设置对话框列表统一管理
+    QFileInfo fi(path);
+    const QString dest = AppPaths::codeTableDir() + "/" + fi.fileName();
+    if (fi.absolutePath() != AppPaths::codeTableDir() && !QFile::exists(dest))
+        QFile::copy(path, dest);
+
+    ConfigManager::instance().setAutoLoadCodeTablePath(
+        QFile::exists(dest) ? dest : path);
+    ConfigManager::instance().save();
     statusBar()->showMessage(tr("已导入码表: %1").arg(m_codeTable->name()), 3000);
     ensureViewFocus();
 }

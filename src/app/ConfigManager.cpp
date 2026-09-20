@@ -122,6 +122,17 @@ QString ConfigManager::currentCodeTable() const
     return get("typing.currentCodeTable", "wubi86").toString();
 }
 
+
+QString ConfigManager::autoLoadCodeTablePath() const
+{
+    return get("typing.autoLoadCodeTablePath", "").toString();
+}
+
+void ConfigManager::setAutoLoadCodeTablePath(const QString& path)
+{
+    set("typing.autoLoadCodeTablePath", path);
+}
+
 QHash<int, QColor> ConfigManager::customThemeColors() const
 {
     QHash<int, QColor> result;

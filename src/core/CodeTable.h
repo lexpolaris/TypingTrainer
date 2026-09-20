@@ -20,20 +20,26 @@ public:
 
     QString name() const { return m_name; }
     void setName(const QString& n) { m_name = n; }
-    bool isEmpty() const { return m_charToCodes.isEmpty(); }
 
-    /// 单字查询编码（返回该字的所有编码）
-    QStringList codesFor(QChar ch) const;
+    /// 有词或有字都算非空
+    bool isEmpty() const {
+        return m_wordToCodes.isEmpty() && m_codeToWords.isEmpty();
+    }
 
-    /// 编码查询候选字
-    QStringList charsFor(const QString& code) const;
+    /// 查询编码（word 长度 1 即单字，>1 即词语）
+    QStringList codesFor(const QString& word) const;
+
+    /// 编码查询候选词（返回的 QString 可能是单字或词组）
+    QStringList wordsFor(const QString& code) const;
 
     /// 统计
-    int charCount() const { return m_charToCodes.size(); }
-    int codeCount() const { return m_codeToChars.size(); }
+    int wordCount() const { return m_wordToCodes.size(); }
+    int codeCount() const { return m_codeToWords.size(); }
 
 private:
     QString m_name;
-    QHash<QChar, QStringList> m_charToCodes;   // 字 -> 编码列表
-    QHash<QString, QStringList> m_codeToChars; // 编码 -> 候选字
+    // 词/字 -> 编码列表
+    QHash<QString, QStringList> m_wordToCodes;
+    // 编码 -> 候选词/字（按加入顺序）
+    QHash<QString, QStringList> m_codeToWords;
 };

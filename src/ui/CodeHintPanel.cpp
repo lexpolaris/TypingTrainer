@@ -73,7 +73,8 @@ void CodeHintPanel::showFor(QChar current, QChar)
     m_charLabel->setText(QString(current));
 
     if (m_table && !m_table->isEmpty()) {
-        QStringList codes = m_table->codesFor(current);
+        const QString word = QString(current);
+        QStringList codes = m_table->codesFor(word);
         m_codeLabel->setText(codes.isEmpty()
                                  ? tr("（无编码）")
                                  : codes.join(" / "));
@@ -81,9 +82,9 @@ void CodeHintPanel::showFor(QChar current, QChar)
         // 候选字：取第一个编码的同码字
         QString candidateText;
         if (!codes.isEmpty()) {
-            QStringList chars = m_table->charsFor(codes.first());
-            if (chars.size() > 1) {
-                candidateText = tr("同码: %1").arg(chars.join(" "));
+            QStringList words = m_table->wordsFor(codes.first());
+            if (words.size() > 1) {
+                candidateText = tr("同码: %1").arg(words.join(" "));
             }
         }
         m_candidateLabel->setText(candidateText);
