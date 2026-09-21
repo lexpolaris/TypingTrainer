@@ -2,7 +2,24 @@
 #include "TypingSession.h"
 #include <algorithm>
 
-TypingSession::TypingSession(QObject* parent) : QObject(parent) {}
+TypingSession::TypingSession(QObject* parent) : QObject(parent)
+{
+    m_timeSpeedTimer = new QTimer(this);
+    m_timeSpeedTimer->setSingleShot(false);
+    connect(m_timeSpeedTimer, &QTimer::timeout,
+            this, &TypingSession::onTimeSpeedTick);
+}
+
+void TypingSession::onTimeSpeedTick()
+{
+    if (m_state != Running) return;
+    m_snapshots.append({
+        m_currentIndex,
+        elapsedSeconds(),
+        m_keystrokes,
+        m_backspaces
+    });
+}
 
 // ---------------------------------------------------------------
 // 开始 / 重置
@@ -26,6 +43,8 @@ void TypingSession::startFrom(const QString& targetText, int startIndex)
     m_pausedElapsed = 0;
     m_state = Running;
     m_timer.start();
+    if (m_speedPointMode == TimeBased)
+        m_timeSpeedTimer->start(m_timeIntervalSec * 1000);
     emit stateChanged(m_state);
     emit positionChanged(m_currentIndex, true);
 }
@@ -47,6 +66,7 @@ void TypingSession::reset()
     m_snapshots.clear();
     m_hitSpeedPoints.clear();
     m_mistakes.clear();
+    m_timeSpeedTimer->stop();
     emit stateChanged(m_state);
     emit positionChanged(0, true);
 }
@@ -56,6 +76,7 @@ void TypingSession::pause()
     if (m_state != Running) return;
     m_pausedElapsed += m_timer.elapsed();
     m_state = Paused;
+    m_timeSpeedTimer->stop();
     emit stateChanged(m_state);
 }
 
@@ -63,6 +84,8 @@ void TypingSession::resume()
 {
     if (m_state != Paused) return;
     m_timer.restart();
+    if (m_speedPointMode == TimeBased)
+        m_timeSpeedTimer->start(m_timeIntervalSec * 1000);
     m_state = Running;
     emit stateChanged(m_state);
 }
@@ -91,6 +114,7 @@ bool TypingSession::inputCharacter(QChar ch)
         if (m_state != Finished) {
             m_state = Finished;
             m_pausedElapsed += m_timer.elapsed();
+            m_timeSpeedTimer->stop();
             emit stateChanged(m_state);
             emit finished();
         }
@@ -115,6 +139,7 @@ bool TypingSession::inputCharacter(QChar ch)
             m_currentIndex = probe;
             m_state = Finished;
             m_pausedElapsed += m_timer.elapsed();
+            m_timeSpeedTimer->stop();
             emit stateChanged(m_state);
             emit finished();
         }

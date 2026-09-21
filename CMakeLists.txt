@@ -19,6 +19,7 @@ set(SOURCES
     src/app/ConfigManager.cpp
     src/core/TextDocument.cpp
     src/core/TypingSession.cpp
+    src/core/TextShuffler.cpp
     src/core/CodeTable.cpp
     src/theme/ThemeManager.cpp
     src/ui/MainWindow.cpp
@@ -42,6 +43,7 @@ set(HEADERS
     src/app/ConfigManager.h
     src/core/TextDocument.h
     src/core/TypingSession.h
+    src/core/TextShuffler.h
     src/core/CodeTable.h
     src/theme/ThemeManager.h
     src/ui/MainWindow.h

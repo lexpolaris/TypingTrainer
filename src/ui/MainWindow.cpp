@@ -13,6 +13,7 @@
 #include "core/TextDocument.h"
 #include "core/TypingSession.h"
 #include "core/CodeTable.h"
+#include "core/TextShuffler.h"
 
 #include "app/ConfigManager.h"
 #include "theme/ThemeManager.h"
@@ -104,8 +105,6 @@ void MainWindow::setupUi()
             m_codeHint, &CodeHintPanel::clear);
     connect(m_view, &TypingView::requestRetry,
             this, &MainWindow::onRetry);
-    connect(m_view, &TypingView::requestNextParagraph,
-            this, &MainWindow::onNextParagraph);
 }
 
 void MainWindow::ensureViewFocus()
@@ -154,8 +153,11 @@ void MainWindow::setupMenus()
     auto* typeMenu = menuBar()->addMenu(tr("跟打(&T)"));
     typeMenu->addAction(tr("重打当前段"), QKeySequence("F3"),
                         this, &MainWindow::onRetry);
-    typeMenu->addAction(tr("下一段"), QKeySequence("Return"),
-                        this, &MainWindow::onNextParagraph);
+    typeMenu->addSeparator();
+    auto* actShuffle = typeMenu->addAction(tr("乱序模式"));
+    actShuffle->setCheckable(true);
+    connect(actShuffle, &QAction::toggled,
+            this, &MainWindow::onToggleShuffle);
     typeMenu->addSeparator();
     typeMenu->addAction(tr("错字列表..."), QKeySequence("Ctrl+M"),
                         this, &MainWindow::onShowMistakes);
@@ -350,11 +352,12 @@ void MainWindow::onOpenTextLibrary()
 void MainWindow::loadText(const QString& path)
 {
     QString err;
-    if (!m_doc->loadFromFile(path, &err)) {
+    QString text = TextLoader::loadFile(path, &err);
+    if (text.isEmpty() && !err.isEmpty()) {
         QMessageBox::warning(this, tr("打开失败"), err);
         return;
     }
-    jumpToParagraph(0);
+    loadTextContent(text, QFileInfo(path).fileName());
 }
 
 void MainWindow::loadResourceText(const QString& resPath)
@@ -365,8 +368,7 @@ void MainWindow::loadResourceText(const QString& resPath)
         QMessageBox::warning(this, tr("加载失败"), err);
         return;
     }
-    m_doc->loadFromString(text, QFileInfo(resPath).fileName());
-    jumpToParagraph(0);
+    loadTextContent(text, QFileInfo(resPath).fileName());
 }
 
 // ---------------------------------------------------------------
@@ -600,16 +602,34 @@ void MainWindow::onRetry()
     ensureViewFocus();
 }
 
-void MainWindow::onNextParagraph()
+void MainWindow::loadTextContent(const QString& raw, const QString& name)
 {
-    if (!m_doc || !m_session) return;
-    const auto& paras = m_doc->paragraphs();
-    int cur = currentParagraphIndex();
-    if (cur + 1 >= paras.size()) {
-        statusBar()->showMessage(tr("已经是最后一段"), 2000);
-        return;
+    m_originalText = raw;
+    m_docName = name;
+
+    QString content = m_shuffleMode
+                          ? TextShuffler::shuffle(raw)
+                          : raw;
+
+    m_doc->loadFromString(content, name);
+
+    // 乱序模式使用时间驱动测速点（每 20 秒）
+    if (m_shuffleMode) {
+        m_session->setSpeedPointMode(TypingSession::TimeBased);
+        m_session->setTimeInterval(20);
+    } else {
+        m_session->setSpeedPointMode(TypingSession::PositionBased);
     }
-    jumpToParagraph(cur + 1);
+
+    jumpToParagraph(0);
+}
+
+void MainWindow::onToggleShuffle(bool on)
+{
+    m_shuffleMode = on;
+    if (m_originalText.isEmpty()) return;
+    // 重载当前文本，按新模式重建会话
+    loadTextContent(m_originalText, m_docName);
 }
 
 // ---------------------------------------------------------------

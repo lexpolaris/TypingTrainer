@@ -6,6 +6,7 @@
 #include <QElapsedTimer>
 #include <QVector>
 #include <QSet>
+#include <QTimer>
 
 struct SpeedPointSnapshot
 {
@@ -30,6 +31,12 @@ class TypingSession : public QObject
 public:
     enum State { Idle, Running, Paused, Finished };
     Q_ENUM(State)
+
+    enum SpeedPointMode {
+        PositionBased,   // 位置驱动（打到预设位置记录）
+        TimeBased        // 时间驱动（每 N 秒记录一次）
+    };
+    Q_ENUM(SpeedPointMode)
 
     explicit TypingSession(QObject* parent = nullptr);
 
@@ -79,6 +86,10 @@ public:
     // 测速点
     void setSpeedPoints(const QVector<int>& positions);
     const QVector<SpeedPointSnapshot>& snapshots() const { return m_snapshots; }
+    void setSpeedPointMode(SpeedPointMode mode) { m_speedPointMode = mode; }
+    SpeedPointMode speedPointMode() const { return m_speedPointMode; }
+    void setTimeInterval(int seconds) { m_timeIntervalSec = qMax(1, seconds); }
+    int timeInterval() const { return m_timeIntervalSec; }
 
 signals:
     void positionChanged(int index, bool correct);
@@ -89,6 +100,7 @@ signals:
 private:
     void checkSpeedPoint();
     void recordMistake(int position, QChar expected, QChar actual);
+    void onTimeSpeedTick();
 
     QString m_target;
     int     m_currentIndex = 0;
@@ -104,4 +116,8 @@ private:
     QVector<SpeedPointSnapshot> m_snapshots;
     QSet<int> m_hitSpeedPoints;
     QVector<MistakeRecord> m_mistakes;
+
+    SpeedPointMode m_speedPointMode = PositionBased;
+    int m_timeIntervalSec = 20;
+    QTimer* m_timeSpeedTimer = nullptr;
 };

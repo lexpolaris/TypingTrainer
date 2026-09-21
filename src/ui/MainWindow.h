@@ -29,7 +29,7 @@ private slots:
     void updateStats();
     void onOpenSettings();
     void onRetry();                     // F3
-    void onNextParagraph();             // Enter
+    void onToggleShuffle(bool on);
     void onShowMistakes();              // 错字列表
 
 private:
@@ -43,6 +43,7 @@ private:
     void loadResourceText(const QString& resPath);
     void switchMode(bool pacman);
     void startSessionForText(const QString& targetText, const QString& name);
+    void loadTextContent(const QString& raw, const QString& name);
     void ensureViewFocus();
 
     // 当前光标所在段落的索引
@@ -69,4 +70,8 @@ private:
 
     void applyTypingFont(const QFont& f);
     QFont m_currentTypingFont;
+    
+    bool    m_shuffleMode = false;
+    QString m_originalText;   // 未乱序的原始文本
+    QString m_docName;
 };

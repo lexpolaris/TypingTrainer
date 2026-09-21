@@ -110,7 +110,6 @@ void TypingView::keyPressEvent(QKeyEvent* e)
 
     // Enter：下一段
     if (e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter) {
-        emit requestNextParagraph();
         e->accept();
         return;
     }

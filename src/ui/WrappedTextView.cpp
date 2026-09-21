@@ -119,19 +119,24 @@ void WrappedTextView::ensureCursorVisible(int currentIndex)
     // 上下各预留一个 marginY
     const int topPad = m_marginY;
     const int bottomPad = m_marginY;
-    // 下方至少预留一行缓冲，确保下一行可见
-    const int lookAhead = lineHeight;
+
+    // 下方提前两行滚动：光标行 + 2 行缓冲始终可见
+    const int lookAhead = lineHeight * 3;
+
+    // 已经打过的行数（相对起点），用于控制"刚开打不滚动"
+    const int linesTyped = targetLine;
+    const int kStartScrollAfter = 2;   // 打满 2 行后才启用提前滚动
+
     const int viewTop = m_scrollOffset + topPad;
     const int viewBottom = m_scrollOffset + height() - bottomPad;
 
     if (contentTop < viewTop) {
+        // 向上滚动
         m_scrollOffset = contentTop - topPad;
-    } else if (contentBottom + lookAhead > viewBottom) {
-        // 当前行 + 下一行缓冲 超出视口底部 → 提前滚动
-        // m_scrollOffset = contentBottom + lookAhead - height() + bottomPad;
-        // 让当前行位于视口高度 2/3 处，下方始终留出约 1/3 屏缓冲
-        const int targetY = height() * 2 / 3;
-        m_scrollOffset = contentTop + lineHeight / 2 - targetY;
+    } else if (linesTyped >= kStartScrollAfter
+               && contentBottom + lookAhead > viewBottom) {
+        // 当前行 + 下方两行缓冲超出视口底部 → 提前滚动
+        m_scrollOffset = contentBottom + lookAhead - height() + bottomPad;
     }
 
     const int maxOffset = qMax(0, totalContentHeight() - height() + bottomPad);
