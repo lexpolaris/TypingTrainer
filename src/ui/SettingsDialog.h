@@ -11,7 +11,7 @@ class QTabWidget;
 class SettingsPage;
 class FontSettingsPage;
 class ThemeSettingsPage;
-class CodeTableSettingsPage;
+class StartupSettingsPage;
 class FilterSettingsPage;
 
 // 类型别名，避免 moc 解析嵌套模板
@@ -46,6 +46,6 @@ private:
     // 具体页面（用于取快照）
     FontSettingsPage*           m_fontPage = nullptr;
     ThemeSettingsPage*          m_themePage = nullptr;
-    CodeTableSettingsPage*      m_codeTablePage = nullptr;
+    StartupSettingsPage*        m_startupPage = nullptr;
     FilterSettingsPage*         m_filterPage = nullptr;
 };

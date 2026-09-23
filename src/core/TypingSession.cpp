@@ -8,6 +8,19 @@ TypingSession::TypingSession(QObject* parent) : QObject(parent)
     m_timeSpeedTimer->setSingleShot(false);
     connect(m_timeSpeedTimer, &QTimer::timeout,
             this, &TypingSession::onTimeSpeedTick);
+    
+    m_countdownTimer = new QTimer(this);
+    m_countdownTimer->setSingleShot(true);
+    connect(m_countdownTimer, &QTimer::timeout, this, [this]() {
+        if (m_state == Running) {
+            m_state = Finished;
+            m_pausedElapsed += m_timer.elapsed();
+            m_timeSpeedTimer->stop();
+            emit stateChanged(m_state);
+            emit countdownFinished();
+            emit finished();
+        }
+    });
 }
 
 void TypingSession::onTimeSpeedTick()
@@ -19,6 +32,11 @@ void TypingSession::onTimeSpeedTick()
         m_keystrokes,
         m_backspaces
     });
+}
+
+void TypingSession::setCountdown(int minutes)
+{
+    m_countdownMinutes = qMax(0, minutes);
 }
 
 // ---------------------------------------------------------------
@@ -45,6 +63,10 @@ void TypingSession::startFrom(const QString& targetText, int startIndex)
     m_timer.start();
     if (m_speedPointMode == TimeBased)
         m_timeSpeedTimer->start(m_timeIntervalSec * 1000);
+
+    if (m_countdownMinutes > 0)
+        m_countdownTimer->start(m_countdownMinutes * 60 * 1000);
+
     emit stateChanged(m_state);
     emit positionChanged(m_currentIndex, true);
 }
@@ -67,6 +89,7 @@ void TypingSession::reset()
     m_hitSpeedPoints.clear();
     m_mistakes.clear();
     m_timeSpeedTimer->stop();
+    m_countdownTimer->stop();
     emit stateChanged(m_state);
     emit positionChanged(0, true);
 }
@@ -77,6 +100,7 @@ void TypingSession::pause()
     m_pausedElapsed += m_timer.elapsed();
     m_state = Paused;
     m_timeSpeedTimer->stop();
+    m_countdownTimer->stop();
     emit stateChanged(m_state);
 }
 
@@ -86,6 +110,10 @@ void TypingSession::resume()
     m_timer.restart();
     if (m_speedPointMode == TimeBased)
         m_timeSpeedTimer->start(m_timeIntervalSec * 1000);
+    
+    if (m_countdownMinutes > 0)
+        m_countdownTimer->start(m_countdownMinutes * 60 * 1000);
+    
     m_state = Running;
     emit stateChanged(m_state);
 }

@@ -90,12 +90,17 @@ public:
     SpeedPointMode speedPointMode() const { return m_speedPointMode; }
     void setTimeInterval(int seconds) { m_timeIntervalSec = qMax(1, seconds); }
     int timeInterval() const { return m_timeIntervalSec; }
+    
+    // 倒计时
+    void setCountdown(int minutes);   // 0 表示不启用
+    int countdown() const;
 
 signals:
     void positionChanged(int index, bool correct);
     void stateChanged(State s);
     void finished();
     void mistakeAdded(int position);   // 新错字 / 已有错字 count 增加
+    void countdownFinished();  // 倒计时
 
 private:
     void checkSpeedPoint();
@@ -120,4 +125,7 @@ private:
     SpeedPointMode m_speedPointMode = PositionBased;
     int m_timeIntervalSec = 20;
     QTimer* m_timeSpeedTimer = nullptr;
+
+    int m_countdownMinutes = 0;
+    QTimer* m_countdownTimer = nullptr;
 };

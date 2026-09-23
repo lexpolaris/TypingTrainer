@@ -3,7 +3,7 @@
 
 #include "settings/FontSettingsPage.h"
 #include "settings/ThemeSettingsPage.h"
-#include "settings/CodeTableSettingsPage.h"
+#include "settings/StartupSettingsPage.h"
 #include "settings/FilterSettingsPage.h"
 
 #include "app/ConfigManager.h"
@@ -37,12 +37,12 @@ void SettingsDialog::setupUi()
     m_fontPage      = new FontSettingsPage(this);
     m_themePage     = new ThemeSettingsPage(this);
     m_filterPage    = new FilterSettingsPage(this);
-    m_codeTablePage = new CodeTableSettingsPage(this);
+    m_startupPage = new StartupSettingsPage(this);
 
     addPage(m_fontPage);
     addPage(m_themePage);
     addPage(m_filterPage);
-    addPage(m_codeTablePage);
+    addPage(m_startupPage);
 
     // 底部按钮
     auto* btnBox = new QDialogButtonBox(

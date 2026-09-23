@@ -30,16 +30,35 @@ public:
     QFont typingFont() const;
     void setTypingFont(const QFont& f);
     int     fontPointSize() const;
-    QString fontFamily() const;
-
-    // ---- 其他 ----
-    QString lastTextPath() const;
-    QString currentCodeTable() const;
+    QString fontFamily() const;    
 
     // ---- 码表 ----
     /// 启动时自动加载的码表路径（空表示不自动加载）
+    QString currentCodeTable() const;
     QString autoLoadCodeTablePath() const;
     void setAutoLoadCodeTablePath(const QString& path);
+    // ---- 启动 ----
+    bool    loadLastTextOnStartup() const;
+    void    setLoadLastTextOnStartup(bool on);
+    QString lastTextPath() const;
+    void    setLastTextPath(const QString& path);
+
+    bool    playBgMusicOnStartup() const;
+    void    setPlayBgMusicOnStartup(bool on);
+    QString bgMusicPath() const;
+    void    setBgMusicPath(const QString& path);
+
+    // ---- 练习 ----
+    int     openMode() const;                        // 0从头 1随机 2断点
+    void    setOpenMode(int mode);
+
+    bool    countdownEnabled() const;
+    void    setCountdownEnabled(bool on);
+    int     countdownMinutes() const;
+    void    setCountdownMinutes(int minutes);
+
+    int lastReadPosition(const QString& docName) const;
+    void setLastReadPosition(const QString& docName, int pos);
 
     // ---- 过滤 ----
     FilterOptions filterOptions() const;

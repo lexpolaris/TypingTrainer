@@ -34,6 +34,9 @@
 #include <QLabel>
 #include <QTimer>
 #include <QColorDialog>
+#include <QMediaPlayer>
+#include <QAudioOutput>
+#include <QRandomGenerator>
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
 {
@@ -51,11 +54,15 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
             this, [this](TypingSession::State) { updateStats(); });
     connect(m_session, &TypingSession::mistakeAdded,
             this, [this](int) { updateStats(); });
+    // 记录断点：会话结束时保存当前位置
+    connect(m_session, &TypingSession::finished, this, [this]() {
+        if (m_docName.isEmpty()) return;
+        auto& cfg = ConfigManager::instance();
+        cfg.setLastReadPosition(m_docName, m_session->currentIndex());
+        cfg.save();
+    });
 
     applyConfigToUi();
-
-    // 加载内置示例文本
-    loadResourceText(":/texts/岳阳楼记.txt");
 
     // 启动时按配置自动加载码表
     const QString autoTable = ConfigManager::instance().autoLoadCodeTablePath();
@@ -71,8 +78,20 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
         }
     }
 
+    // 启动时加载上次文章
+    auto& cfg = ConfigManager::instance();
+    if (cfg.loadLastTextOnStartup()) {
+        const QString lastPath = cfg.lastTextPath();
+        if (!lastPath.isEmpty() && QFile::exists(lastPath)) {
+            loadText(lastPath);
+        }
+    }
+
     // 启动后延迟聚焦视图，确保窗口已显示
     QTimer::singleShot(0, this, &MainWindow::ensureViewFocus);
+
+    // 音乐
+    QTimer::singleShot(200, this, &MainWindow::startBgMusic);
 }
 
 MainWindow::~MainWindow()
@@ -608,18 +627,19 @@ void MainWindow::loadTextContent(const QString& raw, const QString& name)
     m_originalText = raw;
     m_docName = name;
 
-    // 先过滤
+    // ---- 1. 过滤 ----
     FilterOptions filterOpt = ConfigManager::instance().filterOptions();
     QString filtered = TextFilter::apply(raw, filterOpt);
 
-    // 再乱序
+    // ---- 2. 乱序 ----
     QString content = m_shuffleMode
                           ? TextShuffler::shuffle(filtered)
                           : filtered;
 
+    // ---- 3. 加载到文档 ----
     m_doc->loadFromString(content, name);
 
-    // 乱序模式使用时间驱动测速点（每 20 秒）
+    // ---- 4. 设置测速点模式 ----
     if (m_shuffleMode) {
         m_session->setSpeedPointMode(TypingSession::TimeBased);
         m_session->setTimeInterval(20);
@@ -627,7 +647,16 @@ void MainWindow::loadTextContent(const QString& raw, const QString& name)
         m_session->setSpeedPointMode(TypingSession::PositionBased);
     }
 
-    jumpToParagraph(0);
+    // ---- 5. 设置倒计时（在 startFrom 之前） ----
+    auto& cfg = ConfigManager::instance();
+    if (cfg.countdownEnabled()) {
+        m_session->setCountdown(cfg.countdownMinutes());
+    } else {
+        m_session->setCountdown(0);
+    }
+
+    // ---- 6. 根据 openMode 决定起始位置 ----
+    startSessionByOpenMode(content);
 }
 
 void MainWindow::onToggleShuffle(bool on)
@@ -661,5 +690,75 @@ void MainWindow::onShowMistakes()
         updateStats();
     });
     dlg.exec();
+    ensureViewFocus();
+}
+
+void MainWindow::startBgMusic()
+{
+    auto& cfg = ConfigManager::instance();
+    if (!cfg.playBgMusicOnStartup()) return;
+
+    const QString path = cfg.bgMusicPath();
+    if (path.isEmpty() || !QFile::exists(path)) return;
+
+    if (!m_bgMusicPlayer) {
+        m_bgMusicPlayer = new QMediaPlayer(this);
+        m_bgMusicOutput = new QAudioOutput(this);
+        m_bgMusicPlayer->setAudioOutput(m_bgMusicOutput);
+        m_bgMusicOutput->setVolume(0.5);
+
+        // 循环播放
+        connect(m_bgMusicPlayer, &QMediaPlayer::mediaStatusChanged,
+                this, [this](QMediaPlayer::MediaStatus s) {
+            if (s == QMediaPlayer::EndOfMedia)
+                m_bgMusicPlayer->play();
+        });
+    }
+
+    m_bgMusicPlayer->setSource(QUrl::fromLocalFile(path));
+    m_bgMusicPlayer->play();
+}
+
+void MainWindow::stopBgMusic()
+{
+    if (m_bgMusicPlayer)
+        m_bgMusicPlayer->stop();
+}
+
+void MainWindow::startSessionByOpenMode(const QString& content)
+{
+    auto& cfg = ConfigManager::instance();
+    const int om = cfg.openMode();   // 0从头 1随机 2断点
+
+    int startIndex = 0;
+
+    if (om == 1) {
+        // 随机选取位置
+        const int total = content.length();
+        if (total > 100) {
+            // 在 [0, total-100) 之间随机
+            startIndex = QRandomGenerator::global()->bounded(total - 100);
+        } else {
+            startIndex = 0;
+        }
+    } else if (om == 2) {
+        // 断点续打：从 ConfigManager 读上次位置
+        // 现在先占位，等 HistoryDb 做完再补
+        startIndex = cfg.lastReadPosition(m_docName);
+        if (startIndex < 0 || startIndex >= content.length())
+            startIndex = 0;
+    } else {
+        // 从头开始
+        startIndex = 0;
+    }
+
+    // 从指定位置开始会话
+    m_session->startFrom(content, startIndex);
+
+    // 更新视图和标题
+    m_view->setDocument(m_doc);
+    m_view->update();
+    setWindowTitle(tr("打字练习 - %1").arg(m_docName));
+    updateStats();
     ensureViewFocus();
 }

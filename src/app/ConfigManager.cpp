@@ -200,3 +200,77 @@ void ConfigManager::setFilterOptions(const FilterOptions& opt)
     set("filter.upperToLower",  opt.upperToLower);
     set("filter.lowerToUpper",  opt.lowerToUpper);
 }
+
+// ---- 启动 ----
+bool ConfigManager::loadLastTextOnStartup() const
+{
+    return get("startup.loadLastText", true).toBool();
+}
+void ConfigManager::setLoadLastTextOnStartup(bool on)
+{
+    set("startup.loadLastText", on);
+}
+
+void ConfigManager::setLastTextPath(const QString& path)
+{
+    set("recent.lastTextPath", path);
+}
+
+bool ConfigManager::playBgMusicOnStartup() const
+{
+    return get("startup.playBgMusic", false).toBool();
+}
+void ConfigManager::setPlayBgMusicOnStartup(bool on)
+{
+    set("startup.playBgMusic", on);
+}
+
+QString ConfigManager::bgMusicPath() const
+{
+    return get("startup.bgMusicPath", "").toString();
+}
+void ConfigManager::setBgMusicPath(const QString& path)
+{
+    set("startup.bgMusicPath", path);
+}
+
+// ---- 练习 ----
+int ConfigManager::openMode() const
+{
+    return get("practice.openMode", 0).toInt();
+}
+void ConfigManager::setOpenMode(int mode)
+{
+    set("practice.openMode", mode);
+}
+
+bool ConfigManager::countdownEnabled() const
+{
+    return get("practice.countdownEnabled", false).toBool();
+}
+void ConfigManager::setCountdownEnabled(bool on)
+{
+    set("practice.countdownEnabled", on);
+}
+
+int ConfigManager::countdownMinutes() const
+{
+    return get("practice.countdownMinutes", 5).toInt();
+}
+void ConfigManager::setCountdownMinutes(int minutes)
+{
+    set("practice.countdownMinutes", qBound(1, minutes, 60));
+}
+
+int ConfigManager::lastReadPosition(const QString& docName) const
+{
+    QJsonObject positions = get("recent.positions").toJsonObject();
+    return positions.value(docName).toInt(0);
+}
+
+void ConfigManager::setLastReadPosition(const QString& docName, int pos)
+{
+    QJsonObject positions = get("recent.positions").toJsonObject();
+    positions.insert(docName, pos);
+    set("recent.positions", positions);
+}

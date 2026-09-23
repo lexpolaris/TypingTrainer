@@ -11,7 +11,7 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-find_package(Qt6 REQUIRED COMPONENTS Widgets Core Gui Charts)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Core Gui Charts Multimedia)
 
 set(SOURCES
     src/main.cpp
@@ -40,7 +40,7 @@ set(SOURCES
     src/ui/settings/SettingsPage.cpp
     src/ui/settings/FontSettingsPage.cpp
     src/ui/settings/ThemeSettingsPage.cpp
-    src/ui/settings/CodeTableSettingsPage.cpp
+    src/ui/settings/StartupSettingsPage.cpp
     src/ui/settings/FilterSettingsPage.cpp
 )
 
@@ -70,7 +70,7 @@ set(HEADERS
     src/ui/settings/SettingsPage.h
     src/ui/settings/FontSettingsPage.h
     src/ui/settings/ThemeSettingsPage.h
-    src/ui/settings/CodeTableSettingsPage.h
+    src/ui/settings/StartupSettingsPage.h
     src/ui/settings/FilterSettingsPage.h
 )
 
@@ -83,6 +83,7 @@ target_link_libraries(TypingTrainer PRIVATE
     Qt6::Core
     Qt6::Gui
     Qt6::Charts
+    Qt6::Multimedia
 )
 
 if(Qt6Charts_FOUND)
