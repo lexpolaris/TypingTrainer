@@ -4,6 +4,7 @@
 #include "settings/FontSettingsPage.h"
 #include "settings/ThemeSettingsPage.h"
 #include "settings/CodeTableSettingsPage.h"
+#include "settings/FilterSettingsPage.h"
 
 #include "app/ConfigManager.h"
 
@@ -35,10 +36,12 @@ void SettingsDialog::setupUi()
     // 创建并添加各页
     m_fontPage      = new FontSettingsPage(this);
     m_themePage     = new ThemeSettingsPage(this);
+    m_filterPage    = new FilterSettingsPage(this);
     m_codeTablePage = new CodeTableSettingsPage(this);
 
     addPage(m_fontPage);
     addPage(m_themePage);
+    addPage(m_filterPage);
     addPage(m_codeTablePage);
 
     // 底部按钮

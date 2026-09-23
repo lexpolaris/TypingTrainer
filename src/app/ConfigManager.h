@@ -7,6 +7,8 @@
 #include <QColor>
 #include <QFont>
 
+struct FilterOptions;
+
 class ConfigManager : public QObject
 {
     Q_OBJECT
@@ -38,6 +40,10 @@ public:
     /// 启动时自动加载的码表路径（空表示不自动加载）
     QString autoLoadCodeTablePath() const;
     void setAutoLoadCodeTablePath(const QString& path);
+
+    // ---- 过滤 ----
+    FilterOptions filterOptions() const;
+    void setFilterOptions(const FilterOptions& opt);
 
 private:
     explicit ConfigManager(QObject* parent = nullptr);

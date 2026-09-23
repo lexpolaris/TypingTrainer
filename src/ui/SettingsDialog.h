@@ -12,6 +12,7 @@ class SettingsPage;
 class FontSettingsPage;
 class ThemeSettingsPage;
 class CodeTableSettingsPage;
+class FilterSettingsPage;
 
 // 类型别名，避免 moc 解析嵌套模板
 using ThemeColorMap = QHash<int, QColor>;
@@ -46,4 +47,5 @@ private:
     FontSettingsPage*           m_fontPage = nullptr;
     ThemeSettingsPage*          m_themePage = nullptr;
     CodeTableSettingsPage*      m_codeTablePage = nullptr;
+    FilterSettingsPage*         m_filterPage = nullptr;
 };

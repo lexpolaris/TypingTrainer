@@ -21,6 +21,7 @@ set(SOURCES
     src/core/TypingSession.cpp
     src/core/TextShuffler.cpp
     src/core/CodeTable.cpp
+    src/core/TextFilter.cpp
     src/theme/ThemeManager.cpp
     src/ui/MainWindow.cpp
     src/ui/TextLibraryDialog.cpp
@@ -40,6 +41,7 @@ set(SOURCES
     src/ui/settings/FontSettingsPage.cpp
     src/ui/settings/ThemeSettingsPage.cpp
     src/ui/settings/CodeTableSettingsPage.cpp
+    src/ui/settings/FilterSettingsPage.cpp
 )
 
 set(HEADERS
@@ -49,6 +51,7 @@ set(HEADERS
     src/core/TypingSession.h
     src/core/TextShuffler.h
     src/core/CodeTable.h
+    src/core/TextFilter.h
     src/theme/ThemeManager.h
     src/ui/MainWindow.h
     src/ui/TextLibraryDialog.h
@@ -68,6 +71,7 @@ set(HEADERS
     src/ui/settings/FontSettingsPage.h
     src/ui/settings/ThemeSettingsPage.h
     src/ui/settings/CodeTableSettingsPage.h
+    src/ui/settings/FilterSettingsPage.h
 )
 
 add_executable(TypingTrainer ${SOURCES} ${HEADERS} resources/resources.qrc)

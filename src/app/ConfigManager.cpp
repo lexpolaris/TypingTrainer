@@ -1,6 +1,7 @@
 // src/app/ConfigManager.cpp
 #include "ConfigManager.h"
 #include "utils/AppPaths.h"
+#include "core/TextFilter.h"
 
 #include <QFile>
 #include <QJsonDocument>
@@ -172,4 +173,30 @@ void ConfigManager::setTypingFont(const QFont& f)
     set("general.fontPointSize", f.pointSize());
     set("general.fontBold", f.bold());
     set("general.fontItalic", f.italic());
+}
+
+FilterOptions ConfigManager::filterOptions() const
+{
+    FilterOptions opt;
+    opt.filterHan     = get("filter.filterHan",     false).toBool();
+    opt.filterNonHan  = get("filter.filterNonHan",  false).toBool();
+    opt.filterUpper   = get("filter.filterUpper",   false).toBool();
+    opt.filterLower   = get("filter.filterLower",   false).toBool();
+    opt.filterDigit   = get("filter.filterDigit",   false).toBool();
+    opt.filterSpace   = get("filter.filterSpace",   false).toBool();
+    opt.upperToLower  = get("filter.upperToLower",  false).toBool();
+    opt.lowerToUpper  = get("filter.lowerToUpper",  false).toBool();
+    return opt;
+}
+
+void ConfigManager::setFilterOptions(const FilterOptions& opt)
+{
+    set("filter.filterHan",     opt.filterHan);
+    set("filter.filterNonHan",  opt.filterNonHan);
+    set("filter.filterUpper",   opt.filterUpper);
+    set("filter.filterLower",   opt.filterLower);
+    set("filter.filterDigit",   opt.filterDigit);
+    set("filter.filterSpace",   opt.filterSpace);
+    set("filter.upperToLower",  opt.upperToLower);
+    set("filter.lowerToUpper",  opt.lowerToUpper);
 }

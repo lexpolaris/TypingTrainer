@@ -14,6 +14,7 @@
 #include "core/TypingSession.h"
 #include "core/CodeTable.h"
 #include "core/TextShuffler.h"
+#include "core/TextFilter.h"
 
 #include "app/ConfigManager.h"
 #include "theme/ThemeManager.h"
@@ -607,9 +608,14 @@ void MainWindow::loadTextContent(const QString& raw, const QString& name)
     m_originalText = raw;
     m_docName = name;
 
+    // 先过滤
+    FilterOptions filterOpt = ConfigManager::instance().filterOptions();
+    QString filtered = TextFilter::apply(raw, filterOpt);
+
+    // 再乱序
     QString content = m_shuffleMode
-                          ? TextShuffler::shuffle(raw)
-                          : raw;
+                          ? TextShuffler::shuffle(filtered)
+                          : filtered;
 
     m_doc->loadFromString(content, name);
 
