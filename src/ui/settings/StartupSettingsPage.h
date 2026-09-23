@@ -27,7 +27,6 @@ public:
 private slots:
     void onLoadLastTextToggled(bool on);
     void onPlayBgMusicToggled(bool on);
-    void onChooseBgMusic();
     void onCountdownToggled(bool on);
     void onImportCodeTable();
     void onClearCodeTable();
@@ -41,9 +40,7 @@ private:
     QCheckBox*   m_loadLastText = nullptr;
 
     QCheckBox*   m_playBgMusic = nullptr;
-    QLineEdit*   m_bgMusicPath = nullptr;
-    QPushButton* m_chooseBgMusicBtn = nullptr;
-
+    
     // ---- 打开文章时 ----
     QRadioButton* m_openFromStart = nullptr;
     QRadioButton* m_openRandom   = nullptr;

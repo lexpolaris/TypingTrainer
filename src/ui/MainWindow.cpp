@@ -9,6 +9,7 @@
 #include "SpeedChartDialog.h"
 #include "SettingsDialog.h"
 #include "MistakeDialog.h"
+#include "MusicLibraryDialog.h" 
 
 #include "core/TextDocument.h"
 #include "core/TypingSession.h"
@@ -17,6 +18,7 @@
 #include "core/TextFilter.h"
 
 #include "app/ConfigManager.h"
+#include "app/MusicPlayer.h"
 #include "theme/ThemeManager.h"
 #include "utils/AppPaths.h"
 #include "utils/TextLoader.h"
@@ -37,6 +39,9 @@
 #include <QMediaPlayer>
 #include <QAudioOutput>
 #include <QRandomGenerator>
+#include <QToolButton>
+#include <QStyle>
+#include <QCloseEvent>
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
 {
@@ -47,6 +52,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
     setupUi();
     setupMenus();
     setupStatusBar();
+    setupMusicPlayer();
 
     connect(m_session, &TypingSession::positionChanged,
             this, &MainWindow::updateStats);
@@ -62,6 +68,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
         cfg.save();
     });
 
+    auto& cfg = ConfigManager::instance();
     applyConfigToUi();
 
     // 启动时按配置自动加载码表
@@ -77,9 +84,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
             qWarning() << "自动加载码表失败:" << autoTable << err;
         }
     }
-
-    // 启动时加载上次文章
-    auto& cfg = ConfigManager::instance();
+   
     if (cfg.loadLastTextOnStartup()) {
         const QString lastPath = cfg.lastTextPath();
         if (!lastPath.isEmpty() && QFile::exists(lastPath)) {
@@ -89,9 +94,6 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
 
     // 启动后延迟聚焦视图，确保窗口已显示
     QTimer::singleShot(0, this, &MainWindow::ensureViewFocus);
-
-    // 音乐
-    QTimer::singleShot(200, this, &MainWindow::startBgMusic);
 }
 
 MainWindow::~MainWindow()
@@ -255,6 +257,18 @@ void MainWindow::setupMenus()
         ConfigManager::instance().save();
         ThemeManager::instance().applyToApplication();
     });
+
+    // ---------- 音乐 ----------
+    auto* musicMenu = menuBar()->addMenu(tr("音乐(&B)"));
+    musicMenu->addAction(tr("音乐库..."), QKeySequence("Ctrl+Shift+M"),
+                        this, &MainWindow::onOpenMusicLibrary);
+    musicMenu->addSeparator();
+    musicMenu->addAction(tr("播放/暂停"), QKeySequence("Ctrl+P"),
+                        this, &MainWindow::onPlayPauseMusic);
+    musicMenu->addAction(tr("下一首"), QKeySequence("Ctrl+Right"),
+                        this, &MainWindow::onNextMusic);
+    musicMenu->addAction(tr("上一首"), QKeySequence("Ctrl+Left"),
+                        this, &MainWindow::onPrevMusic);
 }
 
 void MainWindow::setupStatusBar()
@@ -273,6 +287,8 @@ void MainWindow::setupStatusBar()
     statusBar()->addPermanentWidget(m_statusCode);
     statusBar()->addPermanentWidget(m_statusStats);
     statusBar()->addPermanentWidget(m_statusMistakes);
+
+    setupStatusBarMusic();
 
     connect(&ThemeManager::instance(), &ThemeManager::themeChanged,
             this, [this] {
@@ -693,38 +709,6 @@ void MainWindow::onShowMistakes()
     ensureViewFocus();
 }
 
-void MainWindow::startBgMusic()
-{
-    auto& cfg = ConfigManager::instance();
-    if (!cfg.playBgMusicOnStartup()) return;
-
-    const QString path = cfg.bgMusicPath();
-    if (path.isEmpty() || !QFile::exists(path)) return;
-
-    if (!m_bgMusicPlayer) {
-        m_bgMusicPlayer = new QMediaPlayer(this);
-        m_bgMusicOutput = new QAudioOutput(this);
-        m_bgMusicPlayer->setAudioOutput(m_bgMusicOutput);
-        m_bgMusicOutput->setVolume(0.5);
-
-        // 循环播放
-        connect(m_bgMusicPlayer, &QMediaPlayer::mediaStatusChanged,
-                this, [this](QMediaPlayer::MediaStatus s) {
-            if (s == QMediaPlayer::EndOfMedia)
-                m_bgMusicPlayer->play();
-        });
-    }
-
-    m_bgMusicPlayer->setSource(QUrl::fromLocalFile(path));
-    m_bgMusicPlayer->play();
-}
-
-void MainWindow::stopBgMusic()
-{
-    if (m_bgMusicPlayer)
-        m_bgMusicPlayer->stop();
-}
-
 void MainWindow::startSessionByOpenMode(const QString& content)
 {
     auto& cfg = ConfigManager::instance();
@@ -761,4 +745,160 @@ void MainWindow::startSessionByOpenMode(const QString& content)
     setWindowTitle(tr("打字练习 - %1").arg(m_docName));
     updateStats();
     ensureViewFocus();
+}
+
+void MainWindow::setupMusicPlayer()
+{
+    m_musicPlayer = new MusicPlayer(this);
+
+    connect(m_musicPlayer, &MusicPlayer::stateChanged,
+            this, &MainWindow::updateMusicUi);
+    connect(m_musicPlayer, &MusicPlayer::trackChanged,
+            this, [this](const QString& path, int) {
+        if (m_musicTrackLabel) {
+            m_musicTrackLabel->setText(QFileInfo(path).fileName());
+            m_musicTrackLabel->setToolTip(path);
+        }
+        updateMusicUi();
+    });
+    connect(m_musicPlayer, &MusicPlayer::errorOccurred,
+            this, [this](const QString& msg) {
+        statusBar()->showMessage(tr("音乐播放错误: %1").arg(msg), 5000);
+    });
+    connect(m_musicPlayer, &MusicPlayer::playlistChanged,
+            this, &MainWindow::updateMusicUi);
+
+    auto& cfg = ConfigManager::instance();
+    m_musicPlayer->setPlaylist(cfg.musicFiles());
+    m_musicPlayer->setVolume(cfg.musicVolume());
+    m_musicPlayer->setLoopMode(
+        static_cast<MusicPlayer::LoopMode>(cfg.musicLoopMode()));
+
+    // 延迟启动播放（等窗口显示后）
+    QTimer::singleShot(300, this, [this]() {
+        auto& cfg = ConfigManager::instance();
+        if (!cfg.playBgMusicOnStartup()) return;
+        if (!m_musicPlayer) return;
+
+        // 列表为空 → 不播
+        if (m_musicPlayer->playlist().isEmpty()) return;
+
+        // 从上次播放的索引开始（默认 0）
+        const int lastIdx = cfg.musicCurrentIndex();
+        if (lastIdx >= 0 && lastIdx < m_musicPlayer->playlist().size()) {
+            m_musicPlayer->playFile(m_musicPlayer->playlist().at(lastIdx));
+        } else {
+            m_musicPlayer->play();   // 从第 1 首开始
+        }
+    });
+}
+
+void MainWindow::setupStatusBarMusic()
+{
+    // 曲名标签
+    m_musicTrackLabel = new QLabel(tr("（无音乐）"), this);
+    m_musicTrackLabel->setMinimumWidth(120);
+    m_musicTrackLabel->setMaximumWidth(200);
+    m_musicTrackLabel->setStyleSheet("color: palette(mid);");
+
+    // 按钮（用文字符号，避免额外图片资源）
+    m_musicPrevBtn = new QToolButton(this);
+    m_musicPrevBtn->setIcon(style()->standardIcon(QStyle::SP_MediaSkipBackward));
+    m_musicPrevBtn->setToolTip(tr("上一首"));
+    m_musicPrevBtn->setAutoRaise(true);
+
+    m_musicPlayBtn = new QToolButton(this);
+    m_musicPlayBtn->setIcon(style()->standardIcon(QStyle::SP_MediaPlay));
+    m_musicPlayBtn->setToolTip(tr("播放/暂停"));
+    m_musicPlayBtn->setAutoRaise(true);
+
+    m_musicNextBtn = new QToolButton(this);
+    m_musicNextBtn->setIcon(style()->standardIcon(QStyle::SP_MediaSkipForward));
+    m_musicNextBtn->setToolTip(tr("下一首"));
+    m_musicNextBtn->setAutoRaise(true);
+
+    // 加到状态栏右侧（PermanentWidget 是右对齐）
+    statusBar()->addPermanentWidget(m_musicTrackLabel);
+    statusBar()->addPermanentWidget(m_musicPrevBtn);
+    statusBar()->addPermanentWidget(m_musicPlayBtn);
+    statusBar()->addPermanentWidget(m_musicNextBtn);
+
+    // 连接
+    connect(m_musicPrevBtn, &QToolButton::clicked,
+            this, &MainWindow::onPrevMusic);
+    connect(m_musicPlayBtn, &QToolButton::clicked,
+            this, &MainWindow::onPlayPauseMusic);
+    connect(m_musicNextBtn, &QToolButton::clicked,
+            this, &MainWindow::onNextMusic);
+}
+
+void MainWindow::onPlayPauseMusic()
+{
+    if (m_musicPlayer->playlist().isEmpty()) {
+        // 没有音乐，打开音乐库
+        onOpenMusicLibrary();
+        return;
+    }
+    m_musicPlayer->togglePlayPause();
+}
+
+void MainWindow::onNextMusic()
+{
+    m_musicPlayer->next();
+}
+
+void MainWindow::onPrevMusic()
+{
+    m_musicPlayer->previous();
+}
+
+void MainWindow::onOpenMusicLibrary()
+{
+    MusicLibraryDialog dlg(this);
+    connect(&dlg, &MusicLibraryDialog::playRequested,
+            this, [this](const QString& path) {
+        m_musicPlayer->playFile(path);
+    });
+    if (dlg.exec() == QDialog::Accepted) {
+        // 更新播放器列表
+        m_musicPlayer->setPlaylist(dlg.playlist());
+        ConfigManager::instance().save();
+    }
+}
+
+void MainWindow::updateMusicUi()
+{
+    const bool playing = m_musicPlayer->isPlaying();
+    m_musicPlayBtn->setText(playing ? "暂停" : "播放");
+    m_musicPlayBtn->setToolTip(playing ? tr("暂停") : tr("播放"));
+
+    // 没音乐时禁用按钮
+    const bool hasMusic = !m_musicPlayer->playlist().isEmpty();
+    m_musicPrevBtn->setEnabled(hasMusic);
+    m_musicPlayBtn->setEnabled(hasMusic);
+    m_musicNextBtn->setEnabled(hasMusic);
+
+    if (!hasMusic)
+        m_musicTrackLabel->setText(tr("（无音乐）"));
+}
+
+void MainWindow::closeEvent(QCloseEvent* e)
+{
+    auto& cfg = ConfigManager::instance();
+
+    // 断点
+    if (m_session && !m_docName.isEmpty()) {
+        cfg.setLastReadPosition(m_docName, m_session->currentIndex());
+    }
+
+    // 音乐
+    if (m_musicPlayer) {
+        cfg.setMusicVolume(m_musicPlayer->volume());
+        cfg.setMusicLoopMode(int(m_musicPlayer->loopMode()));
+        cfg.setMusicFiles(m_musicPlayer->playlist());
+        cfg.setMusicCurrentIndex(m_musicPlayer->currentIndex());
+    }
+
+    cfg.save();
+    QMainWindow::closeEvent(e);
 }

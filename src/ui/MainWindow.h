@@ -5,12 +5,15 @@
 #include <QMediaPlayer>
 #include <QAudioOutput>
 
+class QLabel;
+class QToolButton;
+
 class TextDocument;
 class TypingSession;
 class CodeTable;
 class TypingView;
 class CodeHintPanel;
-class QLabel;
+class MusicPlayer; 
 
 class MainWindow : public QMainWindow
 {
@@ -33,6 +36,12 @@ private slots:
     void onRetry();                     // F3
     void onToggleShuffle(bool on);
     void onShowMistakes();              // 错字列表
+
+    void onOpenMusicLibrary();
+    void onPlayPauseMusic();
+    void onNextMusic();
+    void onPrevMusic();
+    void updateMusicUi();
 
 private:
     void setupUi();
@@ -78,8 +87,17 @@ private:
     QString m_originalText;   // 未乱序的原始文本
     QString m_docName;
 
-    QMediaPlayer* m_bgMusicPlayer = nullptr;
-    QAudioOutput* m_bgMusicOutput = nullptr;
-    void startBgMusic();
-    void stopBgMusic();
+    void setupMusicPlayer();
+    void setupStatusBarMusic();
+
+    MusicPlayer* m_musicPlayer = nullptr;
+
+    // 状态栏音乐控件
+    QLabel*      m_musicTrackLabel = nullptr;
+    QToolButton* m_musicPrevBtn = nullptr;
+    QToolButton* m_musicPlayBtn = nullptr;
+    QToolButton* m_musicNextBtn = nullptr;
+
+protected:
+    void closeEvent(QCloseEvent* e) override;
 };

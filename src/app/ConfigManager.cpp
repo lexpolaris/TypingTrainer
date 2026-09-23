@@ -4,6 +4,7 @@
 #include "core/TextFilter.h"
 
 #include <QFile>
+#include <QJsonArray> 
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QColor>
@@ -225,15 +226,6 @@ void ConfigManager::setPlayBgMusicOnStartup(bool on)
     set("startup.playBgMusic", on);
 }
 
-QString ConfigManager::bgMusicPath() const
-{
-    return get("startup.bgMusicPath", "").toString();
-}
-void ConfigManager::setBgMusicPath(const QString& path)
-{
-    set("startup.bgMusicPath", path);
-}
-
 // ---- 练习 ----
 int ConfigManager::openMode() const
 {
@@ -273,4 +265,64 @@ void ConfigManager::setLastReadPosition(const QString& docName, int pos)
     QJsonObject positions = get("recent.positions").toJsonObject();
     positions.insert(docName, pos);
     set("recent.positions", positions);
+}
+
+// ---- 音乐 ----
+QString ConfigManager::musicFolder() const
+{
+    return get("music.folder", "").toString();
+}
+
+void ConfigManager::setMusicFolder(const QString& folder)
+{
+    set("music.folder", folder);
+}
+
+QStringList ConfigManager::musicFiles() const
+{
+    QJsonArray arr = get("music.files").toJsonArray();
+    QStringList result;
+    for (const auto& v : arr) {
+        const QString s = v.toString();
+        if (!s.isEmpty()) result << s;
+    }
+    return result;
+}
+
+void ConfigManager::setMusicFiles(const QStringList& files)
+{
+    QJsonArray arr;
+    for (const QString& f : files)
+        arr.append(f);
+    set("music.files", arr);
+}
+
+int ConfigManager::musicCurrentIndex() const
+{
+    return get("music.currentIndex", -1).toInt();
+}
+
+void ConfigManager::setMusicCurrentIndex(int idx)
+{
+    set("music.currentIndex", idx);
+}
+
+int ConfigManager::musicVolume() const
+{
+    return get("music.volume", 50).toInt();
+}
+
+void ConfigManager::setMusicVolume(int v)
+{
+    set("music.volume", qBound(0, v, 100));
+}
+
+int ConfigManager::musicLoopMode() const
+{
+    return get("music.loopMode", 1).toInt();   // 默认 LoopAll
+}
+
+void ConfigManager::setMusicLoopMode(int mode)
+{
+    set("music.loopMode", qBound(0, mode, 2));
 }

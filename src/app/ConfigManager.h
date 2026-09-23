@@ -6,6 +6,7 @@
 #include <QString>
 #include <QColor>
 #include <QFont>
+#include <QStringList>
 
 struct FilterOptions;
 
@@ -37,6 +38,7 @@ public:
     QString currentCodeTable() const;
     QString autoLoadCodeTablePath() const;
     void setAutoLoadCodeTablePath(const QString& path);
+
     // ---- 启动 ----
     bool    loadLastTextOnStartup() const;
     void    setLoadLastTextOnStartup(bool on);
@@ -45,8 +47,16 @@ public:
 
     bool    playBgMusicOnStartup() const;
     void    setPlayBgMusicOnStartup(bool on);
-    QString bgMusicPath() const;
-    void    setBgMusicPath(const QString& path);
+    QString     musicFolder() const;
+    void        setMusicFolder(const QString& folder);
+    QStringList musicFiles() const;
+    void        setMusicFiles(const QStringList& files);
+    int         musicCurrentIndex() const;
+    void        setMusicCurrentIndex(int idx);
+    int         musicVolume() const;         // 0..100
+    void        setMusicVolume(int v);
+    int         musicLoopMode() const;       // 0=NoLoop 1=LoopAll 2=LoopOne
+    void        setMusicLoopMode(int mode);
 
     // ---- 练习 ----
     int     openMode() const;                        // 0从头 1随机 2断点
@@ -57,6 +67,7 @@ public:
     int     countdownMinutes() const;
     void    setCountdownMinutes(int minutes);
 
+    // ---- 断点续打 ----
     int lastReadPosition(const QString& docName) const;
     void setLastReadPosition(const QString& docName, int pos);
 

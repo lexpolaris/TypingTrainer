@@ -17,6 +17,7 @@ set(SOURCES
     src/main.cpp
     src/app/Application.cpp
     src/app/ConfigManager.cpp
+    src/app/MusicPlayer.cpp
     src/core/TextDocument.cpp
     src/core/TypingSession.cpp
     src/core/TextShuffler.cpp
@@ -29,6 +30,7 @@ set(SOURCES
     src/ui/PacmanView.cpp
     src/ui/TwoLineView.cpp
     src/ui/CodeHintPanel.cpp
+    src/ui/MusicLibraryDialog.cpp
     src/utils/AppPaths.cpp
     src/utils/TextLoader.cpp
     src/core/SpeedPointFinder.cpp
@@ -47,6 +49,7 @@ set(SOURCES
 set(HEADERS
     src/app/Application.h
     src/app/ConfigManager.h
+    src/app/MusicPlayer.h
     src/core/TextDocument.h
     src/core/TypingSession.h
     src/core/TextShuffler.h
@@ -59,6 +62,7 @@ set(HEADERS
     src/ui/PacmanView.h
     src/ui/TwoLineView.h
     src/ui/CodeHintPanel.h
+    src/ui/MusicLibraryDialog.h
     src/utils/AppPaths.h
     src/utils/TextLoader.h
     src/core/SpeedPointFinder.h

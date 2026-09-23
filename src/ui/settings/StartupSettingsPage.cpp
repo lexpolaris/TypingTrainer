@@ -50,18 +50,10 @@ void StartupSettingsPage::setupUi()
 
     // ---- 背景音乐 ----
     m_playBgMusic = new QCheckBox(tr("播放背景音乐"), startupBox);
+    m_playBgMusic->setToolTip(
+        tr("启动时自动播放音乐库中的歌曲。\n"
+        "音乐列表通过「音乐 → 音乐库」菜单管理。"));
     startupLayout->addWidget(m_playBgMusic);
-
-    auto* musicRow = new QHBoxLayout();
-    musicRow->addSpacing(24);
-    musicRow->addWidget(new QLabel(tr("文件:"), startupBox));
-    m_bgMusicPath = new QLineEdit(startupBox);
-    m_bgMusicPath->setReadOnly(true);
-    m_bgMusicPath->setPlaceholderText(tr("（未选择）"));
-    musicRow->addWidget(m_bgMusicPath, 1);
-    m_chooseBgMusicBtn = new QPushButton(tr("选择..."), startupBox);
-    musicRow->addWidget(m_chooseBgMusicBtn);
-    startupLayout->addLayout(musicRow);
 
     layout->addWidget(startupBox);
 
@@ -140,8 +132,6 @@ void StartupSettingsPage::setupUi()
             this, [this](bool) { updateControlStates(); });
     connect(m_playBgMusic, &QCheckBox::toggled,
             this, &StartupSettingsPage::onPlayBgMusicToggled);
-    connect(m_chooseBgMusicBtn, &QPushButton::clicked,
-            this, &StartupSettingsPage::onChooseBgMusic);
     connect(m_countdownEnabled, &QCheckBox::toggled,
             this, &StartupSettingsPage::onCountdownToggled);
 
@@ -156,10 +146,6 @@ void StartupSettingsPage::setupUi()
 // ---------------------------------------------------------------
 void StartupSettingsPage::updateControlStates()
 {
-    // 背景音乐选择按钮：勾选才能用
-    m_bgMusicPath->setEnabled(m_playBgMusic->isChecked());
-    m_chooseBgMusicBtn->setEnabled(m_playBgMusic->isChecked());
-
     // 倒计时分钟：勾选才能用
     m_countdownMinutes->setEnabled(m_countdownEnabled->isChecked());
 }
@@ -221,8 +207,6 @@ void StartupSettingsPage::loadFromConfig()
     // ---- 启动时 ----
     m_loadLastText->setChecked(cfg.loadLastTextOnStartup());
     m_playBgMusic->setChecked(cfg.playBgMusicOnStartup());
-    m_bgMusicPath->setText(cfg.bgMusicPath());
-    m_bgMusicPath->setToolTip(cfg.bgMusicPath());
 
     // ---- 打开文章时 ----
     int om = cfg.openMode();
@@ -255,7 +239,6 @@ void StartupSettingsPage::saveToConfig()
 
     cfg.setLoadLastTextOnStartup(m_loadLastText->isChecked());
     cfg.setPlayBgMusicOnStartup(m_playBgMusic->isChecked());
-    cfg.setBgMusicPath(m_bgMusicPath->text());
 
     int om = 0;
     if (m_openRandom->isChecked()) om = 1;
@@ -275,7 +258,6 @@ void StartupSettingsPage::resetToDefault()
 {
     m_loadLastText->setChecked(true);
     m_playBgMusic->setChecked(false);
-    m_bgMusicPath->clear();
     m_countdownEnabled->setChecked(false);
     m_countdownMinutes->setValue(5);
 
@@ -290,18 +272,6 @@ void StartupSettingsPage::resetToDefault()
 // ---------------------------------------------------------------
 // 事件
 // ---------------------------------------------------------------
-void StartupSettingsPage::onChooseBgMusic()
-{
-    const QString path = QFileDialog::getOpenFileName(
-        this, tr("选择背景音乐"),
-        QStandardPaths::writableLocation(QStandardPaths::MusicLocation),
-        tr("音频文件 (*.mp3 *.wav *.ogg *.flac *.m4a);;所有文件 (*)"));
-    if (path.isEmpty()) return;
-
-    m_bgMusicPath->setText(path);
-    m_bgMusicPath->setToolTip(path);
-}
-
 void StartupSettingsPage::onImportCodeTable()
 {
     QString path = QFileDialog::getOpenFileName(
