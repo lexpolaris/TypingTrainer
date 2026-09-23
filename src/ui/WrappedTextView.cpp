@@ -124,7 +124,7 @@ void WrappedTextView::ensureCursorVisible(int currentIndex)
     const int lookAhead = lineHeight * 3;
 
     // 已经打过的行数（相对起点），用于控制"刚开打不滚动"
-    const int linesTyped = targetLine;
+    const int cursorLineIndex = targetLine;
     const int kStartScrollAfter = 2;   // 打满 2 行后才启用提前滚动
 
     const int viewTop = m_scrollOffset + topPad;
@@ -133,7 +133,7 @@ void WrappedTextView::ensureCursorVisible(int currentIndex)
     if (contentTop < viewTop) {
         // 向上滚动
         m_scrollOffset = contentTop - topPad;
-    } else if (linesTyped >= kStartScrollAfter
+    } else if (cursorLineIndex >= kStartScrollAfter
                && contentBottom + lookAhead > viewBottom) {
         // 当前行 + 下方两行缓冲超出视口底部 → 提前滚动
         m_scrollOffset = contentBottom + lookAhead - height() + bottomPad;

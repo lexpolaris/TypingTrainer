@@ -36,6 +36,10 @@ set(SOURCES
     src/ui/WrappedTextView.cpp
     src/ui/SettingsDialog.cpp
     src/ui/MistakeDialog.cpp
+    src/ui/settings/SettingsPage.cpp
+    src/ui/settings/FontSettingsPage.cpp
+    src/ui/settings/ThemeSettingsPage.cpp
+    src/ui/settings/CodeTableSettingsPage.cpp
 )
 
 set(HEADERS
@@ -60,6 +64,10 @@ set(HEADERS
     src/ui/WrappedTextView.h
     src/ui/SettingsDialog.h
     src/ui/MistakeDialog.h
+    src/ui/settings/SettingsPage.h
+    src/ui/settings/FontSettingsPage.h
+    src/ui/settings/ThemeSettingsPage.h
+    src/ui/settings/CodeTableSettingsPage.h
 )
 
 add_executable(TypingTrainer ${SOURCES} ${HEADERS} resources/resources.qrc)
