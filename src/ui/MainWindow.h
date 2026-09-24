@@ -2,18 +2,23 @@
 #pragma once
 
 #include <QMainWindow>
-#include <QMediaPlayer>
-#include <QAudioOutput>
+#include <QFont>
 
 class QLabel;
-class QToolButton;
 
 class TextDocument;
 class TypingSession;
 class CodeTable;
 class TypingView;
 class CodeHintPanel;
-class MusicPlayer; 
+
+class MenuBuilder;
+class MusicController;
+class TextLoaderController;
+class CodeTableController;
+class SpeedController;
+class ThemeController;
+class HistoryController;
 
 class MainWindow : public QMainWindow
 {
@@ -27,48 +32,48 @@ private slots:
     void onOpenTextLibrary();
     void onSwitchModePacman();
     void onSwitchModeTwoLine();
-    void onImportCodeTable();
-    void onSpeedPointSettings();
-    void onShowSpeedChart();
     void onCodeHintRequested(QChar current, QChar next);
     void updateStats();
-    void onOpenSettings();
     void onRetry();                     // F3
     void onToggleShuffle(bool on);
     void onShowMistakes();              // 错字列表
-
     void onOpenMusicLibrary();
-    void onPlayPauseMusic();
-    void onNextMusic();
-    void onPrevMusic();
-    void updateMusicUi();
 
 private:
     void setupUi();
-    void setupMenus();
+    void setupControllers();
     void setupStatusBar();
-    void applyConfigToUi();
-    void saveConfigFromUi();
+    void connectControllers();
     void loadBuiltinCodeTable(const QString& name);
     void loadText(const QString& path);
     void loadResourceText(const QString& resPath);
+    void loadWelcomeText();
     void switchMode(bool pacman);
     void startSessionForText(const QString& targetText, const QString& name);
-    void loadTextContent(const QString& raw, const QString& name);
     void ensureViewFocus();
-    void startSessionByOpenMode(const QString& content);
+    void onTextReady(const QString& content, int startIndex);
 
-    // 当前光标所在段落的索引
-    int currentParagraphIndex() const;
-
-    // 从指定段落开始跟打
+    int  currentParagraphIndex() const;
     void jumpToParagraph(int index);
 
+    QString docName() const;
+
+protected:
+    void closeEvent(QCloseEvent* e) override;
 
     // 数据
-    TextDocument*  m_doc = nullptr;
     TypingSession* m_session = nullptr;
+    TextDocument*  m_doc = nullptr;
     CodeTable*     m_codeTable = nullptr;
+
+    // 控制器
+    MenuBuilder*          m_menuBuilder = nullptr;
+    MusicController*      m_music = nullptr;
+    TextLoaderController* m_textLoader = nullptr;
+    CodeTableController*  m_codeTables = nullptr;
+    SpeedController*      m_speed = nullptr;
+    ThemeController*      m_theme = nullptr;
+    HistoryController*    m_history = nullptr;
 
     // UI
     TypingView*    m_view = nullptr;
@@ -79,28 +84,4 @@ private:
     QLabel*        m_statusProgress = nullptr;
     QLabel*        m_statusStats = nullptr;
     QLabel*        m_statusMistakes = nullptr;
-
-    void applyTypingFont(const QFont& f);
-    QFont m_currentTypingFont;
-    
-    bool    m_shuffleMode = false;
-    QString m_originalText;   // 未乱序的原始文本
-    QString m_docName;
-
-    void setupMusicPlayer();
-    void setupStatusBarMusic();
-
-    MusicPlayer* m_musicPlayer = nullptr;
-
-    // 状态栏音乐控件
-    QLabel*      m_musicTrackLabel = nullptr;
-    QToolButton* m_musicPrevBtn = nullptr;
-    QToolButton* m_musicPlayBtn = nullptr;
-    QToolButton* m_musicNextBtn = nullptr;
-
-    void saveHistoryEntry();
-    QString m_docKey;
-    
-protected:
-    void closeEvent(QCloseEvent* e) override;
 };

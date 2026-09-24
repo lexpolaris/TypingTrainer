@@ -25,6 +25,13 @@ set(SOURCES
     src/core/TextFilter.cpp
     src/theme/ThemeManager.cpp
     src/ui/MainWindow.cpp
+    src/ui/controllers/MenuBuilder.cpp
+    src/ui/controllers/MusicController.cpp
+    src/ui/controllers/TextLoaderController.cpp
+    src/ui/controllers/CodeTableController.cpp
+    src/ui/controllers/SpeedController.cpp
+    src/ui/controllers/ThemeController.cpp
+    src/ui/controllers/HistoryController.cpp
     src/ui/TextLibraryDialog.cpp
     src/ui/TypingView.cpp
     src/ui/PacmanView.cpp
@@ -59,6 +66,13 @@ set(HEADERS
     src/core/TextFilter.h
     src/theme/ThemeManager.h
     src/ui/MainWindow.h
+    src/ui/controllers/MenuBuilder.h
+    src/ui/controllers/MusicController.h
+    src/ui/controllers/TextLoaderController.h
+    src/ui/controllers/CodeTableController.h
+    src/ui/controllers/SpeedController.h
+    src/ui/controllers/ThemeController.h
+    src/ui/controllers/HistoryController.h
     src/ui/TextLibraryDialog.h
     src/ui/TypingView.h
     src/ui/PacmanView.h

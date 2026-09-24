@@ -5,32 +5,29 @@
 #include "TwoLineView.h"
 #include "CodeHintPanel.h"
 #include "TextLibraryDialog.h"
-#include "SpeedPointDialog.h"
-#include "SpeedChartDialog.h"
-#include "SettingsDialog.h"
 #include "MistakeDialog.h"
 #include "MusicLibraryDialog.h"
 #include "HistoryDialog.h"
 
+#include "controllers/MenuBuilder.h"
+#include "controllers/MusicController.h"
+#include "controllers/TextLoaderController.h"
+#include "controllers/CodeTableController.h"
+#include "controllers/SpeedController.h"
+#include "controllers/ThemeController.h"
+#include "controllers/HistoryController.h"
+
 #include "core/TextDocument.h"
 #include "core/TypingSession.h"
 #include "core/CodeTable.h"
-#include "core/TextShuffler.h"
-#include "core/TextFilter.h"
-#include "core/HistoryDb.h"
 
 #include "app/ConfigManager.h"
-#include "app/MusicPlayer.h"
 #include "theme/ThemeManager.h"
 #include "utils/AppPaths.h"
-#include "utils/TextLoader.h"
 
 #include <QMenuBar>
-#include <QMenu>
-#include <QAction>
-#include <QActionGroup>
 #include <QFileDialog>
-#include <QFileInfo>
+#include <QFile>
 #include <QMessageBox>
 #include <QStatusBar>
 #include <QVBoxLayout>
@@ -47,14 +44,11 @@
 
 MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
 {
-    m_doc = new TextDocument(this);
     m_session = new TypingSession(this);
-    m_codeTable = new CodeTable();
 
     setupUi();
-    setupMenus();
+    setupControllers();   // 创建控制器并构建菜单
     setupStatusBar();
-    setupMusicPlayer();
 
     connect(m_session, &TypingSession::positionChanged,
             this, &MainWindow::updateStats);
@@ -62,48 +56,44 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
             this, [this](TypingSession::State) { updateStats(); });
     connect(m_session, &TypingSession::mistakeAdded,
             this, [this](int) { updateStats(); });
-    // 记录断点：会话结束时保存当前位置
     connect(m_session, &TypingSession::finished, this, [this]() {
-        if (m_docName.isEmpty()) return;
+        if (docName().isEmpty()) return;
         auto& cfg = ConfigManager::instance();
-        cfg.setLastReadPosition(m_docName, m_session->currentIndex());
+        cfg.setLastReadPosition(docName(), m_session->currentIndex());
         cfg.save();
     });
     connect(m_session, &TypingSession::finished, this, [this]() {
-        saveHistoryEntry();
+        m_history->save(m_session, docName(), m_textLoader->docKey());
     });
 
     auto& cfg = ConfigManager::instance();
-    applyConfigToUi();
+
+    // 把配置应用到 UI（主题/字体）
+    m_theme->applyConfigToUi(font());
 
     // 启动时按配置自动加载码表
-    const QString autoTable = ConfigManager::instance().autoLoadCodeTablePath();
-    if (!autoTable.isEmpty()) {
-        QString err;
-        if (m_codeTable->loadFromFile(autoTable, &err)) {
-            m_view->setCodeTable(m_codeTable);
-            m_codeHint->setCodeTable(m_codeTable);
-            statusBar()->showMessage(
-                tr("已自动加载码表: %1").arg(m_codeTable->name()), 3000);
-        } else {
-            qWarning() << "自动加载码表失败:" << autoTable << err;
-        }
-    }
-   
+    m_codeTables->loadAutoTable();
+
+    // 启动时加载文本：记住上次且有效 → 上次文章；否则 → 欢迎内容
     if (cfg.loadLastTextOnStartup()) {
         const QString lastPath = cfg.lastTextPath();
         if (!lastPath.isEmpty() && QFile::exists(lastPath)) {
-            loadText(lastPath);
+            if (lastPath.startsWith(":/"))
+                loadResourceText(lastPath);
+            else
+                loadText(lastPath);
+        } else {
+            loadWelcomeText();
         }
+    } else {
+        loadWelcomeText();
     }
 
-    // 启动后延迟聚焦视图，确保窗口已显示
     QTimer::singleShot(0, this, &MainWindow::ensureViewFocus);
 }
 
 MainWindow::~MainWindow()
 {
-    delete m_codeTable;
 }
 
 void MainWindow::setupUi()
@@ -113,19 +103,15 @@ void MainWindow::setupUi()
     root->setContentsMargins(0, 0, 0, 0);
     root->setSpacing(0);
 
-    // 视图（唯一内容区）
     m_view = new PacmanView(central);
     m_view->setSession(m_session);
-    m_view->setDocument(m_doc);
     root->addWidget(m_view, 1);
 
     setCentralWidget(central);
 
-    // 编码提示（浮动，不加入布局，父对象设为主窗口）
     m_codeHint = new CodeHintPanel(this);
     m_codeHint->hide();
 
-    // 信号连接
     connect(m_view, &TypingView::codeHintRequested,
             this, &MainWindow::onCodeHintRequested);
     connect(m_view, &TypingView::codeHintCleared,
@@ -136,121 +122,138 @@ void MainWindow::setupUi()
 
 void MainWindow::ensureViewFocus()
 {
-    if (m_view) {
-        m_view->setFocus(Qt::OtherFocusReason);
-    }
+    if (m_view) m_view->setFocus(Qt::OtherFocusReason);
 }
 
-void MainWindow::setupMenus()
+// ---------------------------------------------------------------
+// 控制器
+// ---------------------------------------------------------------
+void MainWindow::setupControllers()
 {
-    // ---------- 文件 ----------
-    auto* fileMenu = menuBar()->addMenu(tr("文件(&F)"));
-    fileMenu->addAction(tr("打开文本..."), QKeySequence::Open,
-                        this, &MainWindow::onOpenText);
-    fileMenu->addAction(tr("文本库..."), QKeySequence("Ctrl+L"),
-                        this, &MainWindow::onOpenTextLibrary);
-    fileMenu->addSeparator();
-    fileMenu->addAction(tr("设置..."), QKeySequence("Ctrl+,"),
-                        this, &MainWindow::onOpenSettings);
-    fileMenu->addSeparator();
-    fileMenu->addAction(tr("退出"), QKeySequence::Quit,
-                        this, &QWidget::close);
+    // ---- 文本加载控制器 ----
+    m_textLoader = new TextLoaderController(this);
+    m_doc = m_textLoader->document();
+    m_view->setDocument(m_doc);
 
-    // ---------- 模式 ----------
-    auto* modeMenu = menuBar()->addMenu(tr("模式(&M)"));
-    auto* modeGroup = new QActionGroup(this);
-    modeGroup->setExclusive(true);
+    // ---- 码表控制器 ----
+    m_codeTables = new CodeTableController(this);
+    m_codeTable = m_codeTables->codeTable();
 
-    auto* actPacman = modeMenu->addAction(tr("吃豆人模式"));
-    actPacman->setCheckable(true);
-    actPacman->setShortcut(QKeySequence("F1"));
-    actPacman->setChecked(true);
-    modeGroup->addAction(actPacman);
-    connect(actPacman, &QAction::triggered,
+    // ---- 测速 / 主题 / 历史 ----
+    m_speed   = new SpeedController(this);
+    m_theme   = new ThemeController(this);
+    m_history = new HistoryController(this);
+
+    // ---- 菜单构建器 ----
+    m_menuBuilder = new MenuBuilder(this, this);
+    m_menuBuilder->build();
+
+    // ---- 音乐控制器 ----
+    m_music = new MusicController(this);
+    m_music->restoreFromConfig(true);
+
+    connectControllers();
+}
+
+void MainWindow::connectControllers()
+{
+    // ===== 文本加载 =====
+    connect(m_textLoader, &TextLoaderController::textReady,
+            this, &MainWindow::onTextReady);
+    connect(m_textLoader, &TextLoaderController::loadFailed,
+            this, [this](const QString& msg) {
+        QMessageBox::warning(this, tr("打开失败"), msg);
+    });
+    connect(m_textLoader, &TextLoaderController::textPathChanged,
+            this, [](const QString& path) {
+        auto& cfg = ConfigManager::instance();
+        cfg.setLastTextPath(path);
+        cfg.save();
+    });
+
+    // ===== 码表 =====
+    connect(m_codeTables, &CodeTableController::codeTableChanged,
+            this, [this](CodeTable*) {
+        m_view->setCodeTable(m_codeTable);
+        m_codeHint->setCodeTable(m_codeTable);
+    });
+    connect(m_codeTables, &CodeTableController::statusMessage,
+            this, [this](const QString& msg, int t) {
+        statusBar()->showMessage(msg, t);
+    });
+    connect(m_codeTables, &CodeTableController::infoMessage,
+            this, [this](const QString& title, const QString& msg) {
+        QMessageBox::information(this, title, msg);
+    });
+
+    // ===== 测速 =====
+    connect(m_speed, &SpeedController::retrySegmentRequested,
+            this, [this](const QString& segText) {
+        startSessionForText(segText, m_doc->name() + " (重打段)");
+    });
+    connect(m_speed, &SpeedController::statusMessage,
+            this, [this](const QString& msg, int t) {
+        statusBar()->showMessage(msg, t);
+    });
+    connect(m_speed, &SpeedController::infoMessage,
+            this, [this](const QString& title, const QString& msg) {
+        QMessageBox::information(this, title, msg);
+    });
+
+    // ===== 主题 =====
+    connect(m_theme, &ThemeController::fontChanged,
+            this, [this](const QFont& f) {
+        if (m_view) m_view->setTypingFont(f);
+    });
+    connect(m_theme, &ThemeController::themeModeChanged,
+            this, [this](int mode) {
+        m_menuBuilder->setThemeMode(
+            static_cast<MenuBuilder::ThemeMode>(mode));
+    });
+
+    // ===== 菜单 =====
+    connect(m_menuBuilder, &MenuBuilder::openTextRequested,
+            this, &MainWindow::onOpenText);
+    connect(m_menuBuilder, &MenuBuilder::openTextLibraryRequested,
+            this, &MainWindow::onOpenTextLibrary);
+    connect(m_menuBuilder, &MenuBuilder::openSettingsRequested,
+            this, [this]() { m_theme->openSettings(this); ensureViewFocus(); });
+    connect(m_menuBuilder, &MenuBuilder::modePacmanRequested,
             this, &MainWindow::onSwitchModePacman);
-
-    auto* actTwoLine = modeMenu->addAction(tr("双行对照模式"));
-    actTwoLine->setCheckable(true);
-    actTwoLine->setShortcut(QKeySequence("F2"));
-    modeGroup->addAction(actTwoLine);
-    connect(actTwoLine, &QAction::triggered,
+    connect(m_menuBuilder, &MenuBuilder::modeTwoLineRequested,
             this, &MainWindow::onSwitchModeTwoLine);
-    
-    // ---------- 跟打 ----------
-    auto* typeMenu = menuBar()->addMenu(tr("跟打(&T)"));
-    typeMenu->addAction(tr("重打当前段"), QKeySequence("F3"),
-                        this, &MainWindow::onRetry);
-    typeMenu->addSeparator();
-    auto* actShuffle = typeMenu->addAction(tr("乱序模式"));
-    actShuffle->setCheckable(true);
-    connect(actShuffle, &QAction::toggled,
+    connect(m_menuBuilder, &MenuBuilder::retryRequested,
+            this, &MainWindow::onRetry);
+    connect(m_menuBuilder, &MenuBuilder::shuffleToggled,
             this, &MainWindow::onToggleShuffle);
-    typeMenu->addSeparator();
-    typeMenu->addAction(tr("错字列表..."), QKeySequence("Ctrl+M"),
-                        this, &MainWindow::onShowMistakes);
-    typeMenu->addSeparator();
-    typeMenu->addAction(tr("历史成绩..."), QKeySequence("Ctrl+H"),
-                        this, [this]() {
+    connect(m_menuBuilder, &MenuBuilder::showMistakesRequested,
+            this, &MainWindow::onShowMistakes);
+    connect(m_menuBuilder, &MenuBuilder::showHistoryRequested,
+            this, [this]() {
         HistoryDialog dlg(this);
         dlg.exec();
         ensureViewFocus();
     });
-
-    // ---------- 码表 ----------
-    auto* codeMenu = menuBar()->addMenu(tr("码表(&C)"));
-    codeMenu->addAction(tr("五笔86"), this,
-                        [this] { loadBuiltinCodeTable("wubi86"); });
-    codeMenu->addAction(tr("五笔98"), this,
-                        [this] { loadBuiltinCodeTable("wubi98"); });
-    codeMenu->addAction(tr("郑码"),   this,
-                        [this] { loadBuiltinCodeTable("zhengma"); });
-    codeMenu->addSeparator();
-    codeMenu->addAction(tr("导入码表..."), this, &MainWindow::onImportCodeTable);
-
-    // ---------- 测速 ----------
-    auto* speedMenu = menuBar()->addMenu(tr("测速(&S)"));
-    speedMenu->addAction(tr("设置测速点..."), QKeySequence("Ctrl+Shift+S"),
-                         this, &MainWindow::onSpeedPointSettings);
-    speedMenu->addAction(tr("查看测速结果..."), QKeySequence("Ctrl+Shift+R"),
-                         this, &MainWindow::onShowSpeedChart);
-
-    // ---------- 主题 ----------
-    auto* themeMenu = menuBar()->addMenu(tr("主题(&T)"));
-    auto* themeGroup = new QActionGroup(this);
-    themeGroup->setExclusive(true);
-
-    auto* actSys = themeMenu->addAction(tr("跟随系统"));
-    auto* actLight = themeMenu->addAction(tr("亮色"));
-    auto* actDark = themeMenu->addAction(tr("暗色"));
-    for (auto* a : {actSys, actLight, actDark}) {
-        a->setCheckable(true);
-        themeGroup->addAction(a);
-    }
-    auto updateChecks = [=](ThemeManager::Mode m) {
-        actSys->setChecked(m == ThemeManager::System);
-        actLight->setChecked(m == ThemeManager::Light);
-        actDark->setChecked(m == ThemeManager::Dark);
-    };
-    updateChecks(ThemeManager::instance().mode());
-
-    connect(actSys, &QAction::triggered, this, [=] {
-        ThemeManager::instance().setMode(ThemeManager::System);
-        updateChecks(ThemeManager::System);
-        saveConfigFromUi();
+    connect(m_menuBuilder, &MenuBuilder::builtinCodeTableRequested,
+            this, &MainWindow::loadBuiltinCodeTable);
+    connect(m_menuBuilder, &MenuBuilder::importCodeTableRequested,
+            this, [this]() { m_codeTables->importFromFile(this); });
+    connect(m_menuBuilder, &MenuBuilder::speedPointSettingsRequested,
+            this, [this]() {
+        m_speed->openSpeedPointSettings(this, m_doc, m_session);
+        ensureViewFocus();
     });
-    connect(actLight, &QAction::triggered, this, [=] {
-        ThemeManager::instance().setMode(ThemeManager::Light);
-        updateChecks(ThemeManager::Light);
-        saveConfigFromUi();
+    connect(m_menuBuilder, &MenuBuilder::showSpeedChartRequested,
+            this, [this]() {
+        m_speed->openSpeedChart(this, m_doc, m_session);
+        ensureViewFocus();
     });
-    connect(actDark, &QAction::triggered, this, [=] {
-        ThemeManager::instance().setMode(ThemeManager::Dark);
-        updateChecks(ThemeManager::Dark);
-        saveConfigFromUi();
+    connect(m_menuBuilder, &MenuBuilder::themeModeRequested,
+            this, [this](MenuBuilder::ThemeMode mode) {
+        m_theme->setThemeMode(static_cast<int>(mode));
     });
-
-    themeMenu->addSeparator();
-    themeMenu->addAction(tr("自定义当前字符颜色..."), this, [this] {
+    connect(m_menuBuilder, &MenuBuilder::customCurrentColorRequested,
+            this, [this] {
         const auto role = ThemeManager::Current;
         QColor current = ThemeManager::instance().color(role);
         QColor chosen = QColorDialog::getColor(
@@ -258,29 +261,33 @@ void MainWindow::setupMenus()
         if (!chosen.isValid()) return;
 
         ThemeManager::instance().setCustomColor(role, chosen);
-
         auto& cfg = ConfigManager::instance();
         cfg.setCustomThemeColors(ThemeManager::instance().customColors());
         cfg.save();
     });
-    themeMenu->addAction(tr("清除所有自定义颜色"), this, [] {
+    connect(m_menuBuilder, &MenuBuilder::clearCustomColorsRequested,
+            this, [] {
         ThemeManager::instance().clearAllCustomColors();
         ConfigManager::instance().setCustomThemeColors({});
         ConfigManager::instance().save();
         ThemeManager::instance().applyToApplication();
     });
+    connect(m_menuBuilder, &MenuBuilder::openMusicLibraryRequested,
+            this, &MainWindow::onOpenMusicLibrary);
+    connect(m_menuBuilder, &MenuBuilder::playPauseMusicRequested,
+            m_music, &MusicController::togglePlayPause);
+    connect(m_menuBuilder, &MenuBuilder::nextMusicRequested,
+            m_music, &MusicController::next);
+    connect(m_menuBuilder, &MenuBuilder::prevMusicRequested,
+            m_music, &MusicController::previous);
 
-    // ---------- 音乐 ----------
-    auto* musicMenu = menuBar()->addMenu(tr("音乐(&B)"));
-    musicMenu->addAction(tr("音乐库..."), QKeySequence("Ctrl+Shift+M"),
-                        this, &MainWindow::onOpenMusicLibrary);
-    musicMenu->addSeparator();
-    musicMenu->addAction(tr("播放/暂停"), QKeySequence("Ctrl+P"),
-                        this, &MainWindow::onPlayPauseMusic);
-    musicMenu->addAction(tr("下一首"), QKeySequence("Ctrl+Right"),
-                        this, &MainWindow::onNextMusic);
-    musicMenu->addAction(tr("上一首"), QKeySequence("Ctrl+Left"),
-                        this, &MainWindow::onPrevMusic);
+    // ===== 音乐 =====
+    connect(m_music, &MusicController::openLibraryRequested,
+            this, &MainWindow::onOpenMusicLibrary);
+    connect(m_music, &MusicController::errorMessage,
+            this, [this](const QString& msg) {
+        statusBar()->showMessage(msg, 5000);
+    });
 }
 
 void MainWindow::setupStatusBar()
@@ -300,73 +307,16 @@ void MainWindow::setupStatusBar()
     statusBar()->addPermanentWidget(m_statusStats);
     statusBar()->addPermanentWidget(m_statusMistakes);
 
-    setupStatusBarMusic();
+    for (QWidget* w : m_music->statusWidgets())
+        statusBar()->addPermanentWidget(w);
 
     connect(&ThemeManager::instance(), &ThemeManager::themeChanged,
             this, [this] {
         m_statusMistakes->setStyleSheet(QString("color: %1;")
             .arg(ThemeManager::instance().color(ThemeManager::Error).name()));
     });
-    
+
     updateStats();
-}
-
-void MainWindow::applyConfigToUi()
-{
-    auto& cfg = ConfigManager::instance();
-
-    // 主题模式
-    QString tm = cfg.themeMode();
-    ThemeManager::Mode m = ThemeManager::System;
-    if (tm == "light") m = ThemeManager::Light;
-    else if (tm == "dark") m = ThemeManager::Dark;
-    ThemeManager::instance().setMode(m);
-
-    // 自定义颜色
-    QHash<int, QColor> customColors = cfg.customThemeColors();
-    ThemeManager::instance().setCustomColors(customColors);
-
-    // 字体
-    QFont f = cfg.typingFont();
-    if (f.family().isEmpty()) {
-        f = font();
-        f.setPointSize(18);
-    }
-    applyTypingFont(f);
-}
-
-void MainWindow::applyTypingFont(const QFont& f)
-{
-    m_currentTypingFont = f;
-    if (m_view) m_view->setTypingFont(f);
-}
-
-void MainWindow::onOpenSettings()
-{
-    SettingsDialog dlg(this);
-
-    // 实时预览连接
-    connect(&dlg, &SettingsDialog::fontPreview,
-            this, &MainWindow::applyTypingFont);
-    connect(&dlg, &SettingsDialog::themeColorsPreview,
-            this, [this](const QHash<int, QColor>& colors) {
-        ThemeManager::instance().setCustomColors(colors);
-    });
-    // themeModePreview 由 SettingsDialog 内部直接调 ThemeManager，
-    // 无需在这里额外处理
-
-    dlg.exec();
-    ensureViewFocus();
-}
-
-void MainWindow::saveConfigFromUi()
-{
-    auto& cfg = ConfigManager::instance();
-    auto m = ThemeManager::instance().mode();
-    cfg.set("general.themeMode",
-            m == ThemeManager::Light ? "light" :
-            m == ThemeManager::Dark  ? "dark"  : "system");
-    cfg.save();
 }
 
 // ---------------------------------------------------------------
@@ -379,8 +329,6 @@ void MainWindow::onOpenText()
         tr("文本文件 (*.txt);;所有文件 (*)"));
     if (path.isEmpty()) return;
     loadText(path);
-    ConfigManager::instance().set("recent.lastTextPath", path);
-    ConfigManager::instance().save();
 }
 
 void MainWindow::onOpenTextLibrary()
@@ -399,26 +347,40 @@ void MainWindow::onOpenTextLibrary()
 
 void MainWindow::loadText(const QString& path)
 {
-    QString err;
-    QString text = TextLoader::loadFile(path, &err);
-    if (text.isEmpty() && !err.isEmpty()) {
-        QMessageBox::warning(this, tr("打开失败"), err);
-        return;
-    }
-    m_docKey = QFileInfo(path).absoluteFilePath();
-    loadTextContent(text, QFileInfo(path).fileName());
+    m_textLoader->loadFile(path);
 }
 
 void MainWindow::loadResourceText(const QString& resPath)
 {
-    QString err;
-    QString text = TextLoader::loadResource(resPath, &err);
-    if (text.isEmpty()) {
-        QMessageBox::warning(this, tr("加载失败"), err);
-        return;
+    m_textLoader->loadResource(resPath);
+}
+
+void MainWindow::loadWelcomeText()
+{
+    m_textLoader->loadWelcome();
+}
+
+// ---------------------------------------------------------------
+// 文本就绪回调
+// ---------------------------------------------------------------
+void MainWindow::onTextReady(const QString& content, int startIndex)
+{
+    const bool isFollowView = qobject_cast<TwoLineView*>(m_view) != nullptr;
+    if (isFollowView || m_textLoader->shuffleMode()) {
+        m_session->setSpeedPointMode(TypingSession::TimeBased);
+        m_session->setTimeInterval(20);
+    } else {
+        m_session->setSpeedPointMode(TypingSession::PositionBased);
     }
-    m_docKey = resPath;
-    loadTextContent(text, QFileInfo(resPath).fileName());
+
+    auto& cfg = ConfigManager::instance();
+    if (cfg.countdownEnabled())
+        m_session->setCountdown(cfg.countdownMinutes());
+    else
+        m_session->setCountdown(0);
+
+    startSessionForText(content, m_textLoader->docName());
+    Q_UNUSED(startIndex);
 }
 
 // ---------------------------------------------------------------
@@ -428,14 +390,12 @@ void MainWindow::switchMode(bool pacman)
 {
     if (!m_view) return;
 
-    // 判断当前是否已经是目标模式，避免无谓重建
     bool currentlyPacman = qobject_cast<PacmanView*>(m_view) != nullptr;
     if (pacman == currentlyPacman) {
         ensureViewFocus();
         return;
     }
 
-    // 先设置测速点模式（避免 retry 时启动错误的定时器）
     if (pacman) {
         m_session->setSpeedPointMode(TypingSession::PositionBased);
     } else {
@@ -443,7 +403,6 @@ void MainWindow::switchMode(bool pacman)
         m_session->setTimeInterval(20);
     }
 
-    // 创建新视图
     TypingView* newView = pacman
         ? static_cast<TypingView*>(new PacmanView(this))
         : static_cast<TypingView*>(new TwoLineView(this));
@@ -452,7 +411,6 @@ void MainWindow::switchMode(bool pacman)
     newView->setDocument(m_doc);
     newView->setCodeTable(m_codeTable);
 
-    // 替换视图
     auto* central = centralWidget();
     auto* layout = qobject_cast<QVBoxLayout*>(central->layout());
     QLayoutItem* oldItem = layout->replaceWidget(m_view, newView);
@@ -462,18 +420,14 @@ void MainWindow::switchMode(bool pacman)
     m_view = newView;
     old->deleteLater();
 
-    // 设置字体
-    newView->setTypingFont(m_currentTypingFont);
-    newView->update();   // 触发一次重绘
+    newView->setTypingFont(m_theme->typingFont());
+    newView->update();
 
-    // 连接信号
     connect(m_view, &TypingView::codeHintRequested,
             this, &MainWindow::onCodeHintRequested);
 
-    // 最后 retry（会按已设好的测速点模式启动定时器）
-    if (!m_session->target().isEmpty()) {
+    if (!m_session->target().isEmpty())
         m_session->retry();
-    }
 
     updateStats();
     ensureViewFocus();
@@ -494,103 +448,7 @@ void MainWindow::onSwitchModeTwoLine()
 // ---------------------------------------------------------------
 void MainWindow::loadBuiltinCodeTable(const QString& name)
 {
-    QString path = QString(":/tables/%1.txt").arg(name);
-    QString err;
-    if (!m_codeTable->loadFromFile(path, &err)) {
-        QMessageBox::information(this, tr("码表"),
-            tr("内置码表 %1 尚未提供。\n请通过\"导入码表\"加载。").arg(name));
-        return;
-    }
-    m_view->setCodeTable(m_codeTable);
-    m_codeHint->setCodeTable(m_codeTable);
-    ConfigManager::instance().setAutoLoadCodeTablePath(path);
-    ConfigManager::instance().save();
-    statusBar()->showMessage(tr("已加载码表: %1").arg(m_codeTable->name()), 3000);
-    ensureViewFocus();
-}
-
-void MainWindow::onImportCodeTable()
-{
-    QString path = QFileDialog::getOpenFileName(
-        this, tr("导入码表"), AppPaths::codeTableDir(),
-        tr("码表 (*.txt *.mb);;所有文件 (*)"));
-    if (path.isEmpty()) return;
-    QString err;
-    if (!m_codeTable->loadFromFile(path, &err)) {
-        QMessageBox::warning(this, tr("导入失败"), err);
-        return;
-    }
-    m_view->setCodeTable(m_codeTable);
-    m_codeHint->setCodeTable(m_codeTable);
-    // 若源文件不在用户码表目录，复制一份进去，便于设置对话框列表统一管理
-    QFileInfo fi(path);
-    const QString dest = AppPaths::codeTableDir() + "/" + fi.fileName();
-    if (fi.absolutePath() != AppPaths::codeTableDir() && !QFile::exists(dest))
-        QFile::copy(path, dest);
-
-    ConfigManager::instance().setAutoLoadCodeTablePath(
-        QFile::exists(dest) ? dest : path);
-    ConfigManager::instance().save();
-    statusBar()->showMessage(tr("已导入码表: %1").arg(m_codeTable->name()), 3000);
-    ensureViewFocus();
-}
-
-// ---------------------------------------------------------------
-// 测速
-// ---------------------------------------------------------------
-void MainWindow::onSpeedPointSettings()
-{
-    if (!m_doc || m_doc->isEmpty()) {
-        QMessageBox::information(this, tr("测速点"), tr("请先加载文本。"));
-        return;
-    }
-
-    SpeedPointDialog dlg(m_doc->text(), this);
-    if (dlg.exec() != QDialog::Accepted) {
-        ensureViewFocus();
-        return;
-    }
-
-    QVector<int> pts = dlg.selectedPoints();
-    // 若会话已开始，重设测速点需要重置会话统计
-    if (m_session->currentIndex() > m_session->initialStartIndex()) {
-        auto ret = QMessageBox::question(this, tr("测速点"),
-            tr("重设测速点会重置当前统计，是否继续？"),
-            QMessageBox::Yes | QMessageBox::No, QMessageBox::No);
-        if (ret != QMessageBox::Yes) { ensureViewFocus(); return; }
-        m_session->startFrom(m_doc->text(), m_session->initialStartIndex());
-    }
-    m_session->setSpeedPoints(pts);
-    statusBar()->showMessage(tr("已设置 %1 个测速点").arg(pts.size()), 3000);
-    ensureViewFocus();
-}
-
-void MainWindow::onShowSpeedChart()
-{
-    if (!m_session || m_session->currentIndex() == 0) {
-        QMessageBox::information(this, tr("测速结果"), tr("尚未开始跟打。"));
-        return;
-    }
-
-    SpeedChartDialog dlg(m_session, m_doc->text(), this);
-    connect(&dlg, &SpeedChartDialog::requestRetry, this,
-            [this](const QString& segText) {
-        startSessionForText(segText, m_doc->name() + " (重打段)");
-    });
-    dlg.exec();
-    ensureViewFocus();
-}
-
-void MainWindow::startSessionForText(const QString& targetText,
-                                     const QString& name)
-{
-    m_doc->loadFromString(targetText, name);
-    m_session->setSpeedPoints({});
-    m_session->start(targetText);
-    m_view->setDocument(m_doc);
-    m_view->update();
-    setWindowTitle(tr("打字练习 - %1").arg(name));
-    updateStats();
+    m_codeTables->loadBuiltin(name);
     ensureViewFocus();
 }
 
@@ -670,50 +528,10 @@ void MainWindow::onRetry()
     ensureViewFocus();
 }
 
-void MainWindow::loadTextContent(const QString& raw, const QString& name)
-{
-    m_originalText = raw;
-    m_docName = name;
-
-    // ---- 1. 过滤 ----
-    FilterOptions filterOpt = ConfigManager::instance().filterOptions();
-    QString filtered = TextFilter::apply(raw, filterOpt);
-
-    // ---- 2. 乱序 ----
-    QString content = m_shuffleMode
-                          ? TextShuffler::shuffle(filtered)
-                          : filtered;
-
-    // ---- 3. 加载到文档 ----
-    m_doc->loadFromString(content, name);
-
-    // ---- 4. 设置测速点模式 ----
-    const bool isFollowView = qobject_cast<TwoLineView*>(m_view) != nullptr;
-    if (isFollowView || m_shuffleMode) {
-        m_session->setSpeedPointMode(TypingSession::TimeBased);
-        m_session->setTimeInterval(20);
-    } else {
-        m_session->setSpeedPointMode(TypingSession::PositionBased);
-    }
-
-    // ---- 5. 设置倒计时（在 startFrom 之前） ----
-    auto& cfg = ConfigManager::instance();
-    if (cfg.countdownEnabled()) {
-        m_session->setCountdown(cfg.countdownMinutes());
-    } else {
-        m_session->setCountdown(0);
-    }
-
-    // ---- 6. 根据 openMode 决定起始位置 ----
-    startSessionByOpenMode(content);
-}
-
 void MainWindow::onToggleShuffle(bool on)
 {
-    m_shuffleMode = on;
-    if (m_originalText.isEmpty()) return;
-    // 重载当前文本，按新模式重建会话
-    loadTextContent(m_originalText, m_docName);
+    m_textLoader->setShuffleMode(on);
+    m_textLoader->reload();
 }
 
 // ---------------------------------------------------------------
@@ -742,234 +560,52 @@ void MainWindow::onShowMistakes()
     ensureViewFocus();
 }
 
-void MainWindow::startSessionByOpenMode(const QString& content)
+// ---------------------------------------------------------------
+// 会话启动 / 重打段
+// ---------------------------------------------------------------
+void MainWindow::startSessionForText(const QString& targetText,
+                                     const QString& name)
 {
-    auto& cfg = ConfigManager::instance();
-    const int om = cfg.openMode();   // 0从头 1随机 2断点
-
-    int startIndex = 0;
-
-    if (om == 1) {
-        // 随机选取位置
-        const int total = content.length();
-        if (total > 100) {
-            // 在 [0, total-100) 之间随机
-            startIndex = QRandomGenerator::global()->bounded(total - 100);
-        } else {
-            startIndex = 0;
-        }
-    } else if (om == 2) {
-        // 断点续打：从 ConfigManager 读上次位置
-        // 现在先占位，等 HistoryDb 做完再补
-        startIndex = cfg.lastReadPosition(m_docName);
-        if (startIndex < 0 || startIndex >= content.length())
-            startIndex = 0;
-    } else {
-        // 从头开始
-        startIndex = 0;
-    }
-
-    // 从指定位置开始会话
-    m_session->startFrom(content, startIndex);
-
-    // 更新视图和标题
+    m_doc->loadFromString(targetText, name);
+    m_session->setSpeedPoints({});
+    m_session->start(targetText);
     m_view->setDocument(m_doc);
     m_view->update();
-    setWindowTitle(tr("打字练习 - %1").arg(m_docName));
+    setWindowTitle(tr("打字练习 - %1").arg(name));
     updateStats();
     ensureViewFocus();
 }
 
-void MainWindow::setupMusicPlayer()
-{
-    m_musicPlayer = new MusicPlayer(this);
-
-    connect(m_musicPlayer, &MusicPlayer::stateChanged,
-            this, &MainWindow::updateMusicUi);
-    connect(m_musicPlayer, &MusicPlayer::trackChanged,
-            this, [this](const QString& path, int) {
-        if (m_musicTrackLabel) {
-            m_musicTrackLabel->setText(QFileInfo(path).fileName());
-            m_musicTrackLabel->setToolTip(path);
-        }
-        updateMusicUi();
-    });
-    connect(m_musicPlayer, &MusicPlayer::errorOccurred,
-            this, [this](const QString& msg) {
-        statusBar()->showMessage(tr("音乐播放错误: %1").arg(msg), 5000);
-    });
-    connect(m_musicPlayer, &MusicPlayer::playlistChanged,
-            this, &MainWindow::updateMusicUi);
-
-    auto& cfg = ConfigManager::instance();
-    m_musicPlayer->setPlaylist(cfg.musicFiles());
-    m_musicPlayer->setVolume(cfg.musicVolume());
-    m_musicPlayer->setLoopMode(
-        static_cast<MusicPlayer::LoopMode>(cfg.musicLoopMode()));
-
-    // 延迟启动播放（等窗口显示后）
-    QTimer::singleShot(300, this, [this]() {
-        auto& cfg = ConfigManager::instance();
-        if (!cfg.playBgMusicOnStartup()) return;
-        if (!m_musicPlayer) return;
-
-        // 列表为空 → 不播
-        if (m_musicPlayer->playlist().isEmpty()) return;
-
-        // 从上次播放的索引开始（默认 0）
-        const int lastIdx = cfg.musicCurrentIndex();
-        if (lastIdx >= 0 && lastIdx < m_musicPlayer->playlist().size()) {
-            m_musicPlayer->playFile(m_musicPlayer->playlist().at(lastIdx));
-        } else {
-            m_musicPlayer->play();   // 从第 1 首开始
-        }
-    });
-}
-
-void MainWindow::setupStatusBarMusic()
-{
-    // 曲名标签
-    m_musicTrackLabel = new QLabel(tr("（无音乐）"), this);
-    m_musicTrackLabel->setMinimumWidth(120);
-    m_musicTrackLabel->setMaximumWidth(200);
-    m_musicTrackLabel->setStyleSheet("color: palette(mid);");
-
-    // 按钮（用文字符号，避免额外图片资源）
-    m_musicPrevBtn = new QToolButton(this);
-    m_musicPrevBtn->setIcon(style()->standardIcon(QStyle::SP_MediaSkipBackward));
-    m_musicPrevBtn->setToolTip(tr("上一首"));
-    m_musicPrevBtn->setAutoRaise(true);
-
-    m_musicPlayBtn = new QToolButton(this);
-    m_musicPlayBtn->setIcon(style()->standardIcon(QStyle::SP_MediaPlay));
-    m_musicPlayBtn->setToolTip(tr("播放/暂停"));
-    m_musicPlayBtn->setAutoRaise(true);
-
-    m_musicNextBtn = new QToolButton(this);
-    m_musicNextBtn->setIcon(style()->standardIcon(QStyle::SP_MediaSkipForward));
-    m_musicNextBtn->setToolTip(tr("下一首"));
-    m_musicNextBtn->setAutoRaise(true);
-
-    // 加到状态栏右侧（PermanentWidget 是右对齐）
-    statusBar()->addPermanentWidget(m_musicTrackLabel);
-    statusBar()->addPermanentWidget(m_musicPrevBtn);
-    statusBar()->addPermanentWidget(m_musicPlayBtn);
-    statusBar()->addPermanentWidget(m_musicNextBtn);
-
-    // 连接
-    connect(m_musicPrevBtn, &QToolButton::clicked,
-            this, &MainWindow::onPrevMusic);
-    connect(m_musicPlayBtn, &QToolButton::clicked,
-            this, &MainWindow::onPlayPauseMusic);
-    connect(m_musicNextBtn, &QToolButton::clicked,
-            this, &MainWindow::onNextMusic);
-}
-
-void MainWindow::onPlayPauseMusic()
-{
-    if (m_musicPlayer->playlist().isEmpty()) {
-        // 没有音乐，打开音乐库
-        onOpenMusicLibrary();
-        return;
-    }
-    m_musicPlayer->togglePlayPause();
-}
-
-void MainWindow::onNextMusic()
-{
-    m_musicPlayer->next();
-}
-
-void MainWindow::onPrevMusic()
-{
-    m_musicPlayer->previous();
-}
-
+// ---------------------------------------------------------------
+// 音乐
+// ---------------------------------------------------------------
 void MainWindow::onOpenMusicLibrary()
 {
     MusicLibraryDialog dlg(this);
     connect(&dlg, &MusicLibraryDialog::playRequested,
-            this, [this](const QString& path) {
-        m_musicPlayer->playFile(path);
-    });
+            m_music, &MusicController::playFile);
     if (dlg.exec() == QDialog::Accepted) {
-        // 更新播放器列表
-        m_musicPlayer->setPlaylist(dlg.playlist());
+        m_music->setPlaylist(dlg.playlist());
         ConfigManager::instance().save();
     }
 }
 
-void MainWindow::updateMusicUi()
+QString MainWindow::docName() const
 {
-    const bool playing = m_musicPlayer->isPlaying();
-    m_musicPlayBtn->setText(playing ? "暂停" : "播放");
-    m_musicPlayBtn->setToolTip(playing ? tr("暂停") : tr("播放"));
-
-    // 没音乐时禁用按钮
-    const bool hasMusic = !m_musicPlayer->playlist().isEmpty();
-    m_musicPrevBtn->setEnabled(hasMusic);
-    m_musicPlayBtn->setEnabled(hasMusic);
-    m_musicNextBtn->setEnabled(hasMusic);
-
-    if (!hasMusic)
-        m_musicTrackLabel->setText(tr("（无音乐）"));
+    return m_textLoader ? m_textLoader->docName() : QString();
 }
 
 void MainWindow::closeEvent(QCloseEvent* e)
 {
     auto& cfg = ConfigManager::instance();
 
-    // 断点
-    if (m_session && !m_docName.isEmpty()) {
-        cfg.setLastReadPosition(m_docName, m_session->currentIndex());
+    if (m_session && !docName().isEmpty()) {
+        cfg.setLastReadPosition(docName(), m_session->currentIndex());
     }
 
-    // 音乐
-    if (m_musicPlayer) {
-        cfg.setMusicVolume(m_musicPlayer->volume());
-        cfg.setMusicLoopMode(int(m_musicPlayer->loopMode()));
-        cfg.setMusicFiles(m_musicPlayer->playlist());
-        cfg.setMusicCurrentIndex(m_musicPlayer->currentIndex());
-    }
+    if (m_music)
+        m_music->persistToConfig();
 
     cfg.save();
     QMainWindow::closeEvent(e);
-}
-
-void MainWindow::saveHistoryEntry()
-{
-    if (!m_session || m_session->target().isEmpty()) return;
-    if (m_docName.isEmpty()) return;
-
-    // 过滤太短的记录（比如只打了两三个字就结束）
-    if (m_session->currentIndex() < 10) return;
-
-    HistoryEntry e;
-    e.timestamp       = QDateTime::currentDateTime();
-    e.docName         = m_docName;
-    e.docSource       = m_docKey.isEmpty() ? m_docName : m_docKey;
-    e.charCount       = m_session->currentIndex()
-                        - m_session->initialStartIndex();
-    e.correct         = m_session->correctChars();
-    e.errors          = m_session->errorChars();
-    e.backspaces      = m_session->backspaceCount();
-    e.durationSeconds = m_session->elapsedSeconds();
-    e.speedCPM        = m_session->speedCPM();
-    e.keystrokes      = m_session->totalKeystrokes();
-
-    // 准确率
-    const int total = e.charCount;
-    e.accuracy = (total > 0)
-                     ? (total - e.errors) * 100.0 / total
-                     : 0.0;
-    if (e.accuracy < 0) e.accuracy = 0;
-
-    // 码长
-    e.codeLength = (e.correct > 0)
-                       ? double(e.keystrokes) / e.correct
-                       : 0.0;
-
-    if (!HistoryDb::instance().add(e)) {
-        qWarning() << "保存历史失败:" << HistoryDb::instance().lastError();
-    }
 }
