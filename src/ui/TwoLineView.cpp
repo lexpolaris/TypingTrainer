@@ -28,13 +28,19 @@ void TwoLineView::drawVisualLine(QPainter& p,
     const int y1 = baseY + m_marginY;                // 上行顶部
     const int y2 = y1 + fm.height() + m_lineGap;     // 下行顶部
 
+    // ★ 拿用户输入记录
+    const QHash<int, QChar>& userInput =
+        m_session ? m_session->userInput() : QHash<int, QChar>();
+
     int x = m_marginX;
     for (int k = 0; k < vl.length; ++k) {
         const int gi = vl.startIndex + k;
-        QChar ch = text.at(gi);
-        int cw = fm.horizontalAdvance(ch);
+        const QChar ch = text.at(gi);
+        const int cw = fm.horizontalAdvance(ch);
 
-        // ---------- 上行：原文 ----------
+        // =====================================================
+        // 上行：原文
+        // =====================================================
         QColor upColor;
         if (gi < idx)       upColor = th.color(ThemeManager::Typed);
         else if (gi == idx) upColor = th.color(ThemeManager::Current);
@@ -42,24 +48,40 @@ void TwoLineView::drawVisualLine(QPainter& p,
         p.setPen(upColor);
         p.drawText(x, y1 + fm.ascent(), QString(ch));
 
-        // ---------- 下行：输入 ----------
+        // =====================================================
+        // 下行：用户实际输入
+        // =====================================================
         if (gi < idx) {
-            // 已打部分：显示原字符（用户输入与原文一致）
-            p.setPen(th.color(ThemeManager::Typed));
-            p.drawText(x, y2 + fm.ascent(), QString(ch));
+            // 已打过的位置：显示用户当时输入的字符
+            const QChar userCh = userInput.value(gi, QChar());
+            if (!userCh.isNull()) {
+                // 用户输入和原文不一致 → 用错误色
+                const bool wrong = (userCh != ch);
+                p.setPen(wrong ? th.color(ThemeManager::Error)
+                               : th.color(ThemeManager::Typed));
+                p.drawText(x, y2 + fm.ascent(), QString(userCh));
+            }
         } else if (gi == idx) {
-            // 当前字符：高亮块 + 反色文字 + 光标下划线
+            // 当前位置：高亮块 + 用户输入的字符（如有）
+            const QChar userCh = userInput.value(gi, QChar());
+            const bool hasInput = !userCh.isNull();
+            const bool wrong = hasInput && (userCh != ch);
+
             QRectF block(x, y2, cw, fm.height());
-            p.fillRect(block, th.color(ThemeManager::Current));
+            p.fillRect(block, wrong ? th.color(ThemeManager::Error)
+                                    : th.color(ThemeManager::Current));
+
             p.setPen(th.color(ThemeManager::AccentText));
-            p.drawText(x, y2 + fm.ascent(), QString(ch));
+            // 有输入就显示用户的，否则显示原文作占位
+            p.drawText(x, y2 + fm.ascent(),
+                       QString(hasInput ? userCh : ch));
 
             QPen pen(th.color(ThemeManager::Accent), 2);
             p.setPen(pen);
             p.drawLine(QPointF(x, y2 + fm.height()),
                        QPointF(x + cw, y2 + fm.height()));
         }
-        // 未打部分：下行不画
+        // 未打过的位置：下行不画
 
         x += cw;
     }

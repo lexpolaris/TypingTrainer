@@ -421,6 +421,15 @@ void MainWindow::switchMode(bool pacman)
         return;
     }
 
+    // 先设置测速点模式（避免 retry 时启动错误的定时器）
+    if (pacman) {
+        m_session->setSpeedPointMode(TypingSession::PositionBased);
+    } else {
+        m_session->setSpeedPointMode(TypingSession::TimeBased);
+        m_session->setTimeInterval(20);
+    }
+
+    // 创建新视图
     TypingView* newView = pacman
         ? static_cast<TypingView*>(new PacmanView(this))
         : static_cast<TypingView*>(new TwoLineView(this));
@@ -428,8 +437,8 @@ void MainWindow::switchMode(bool pacman)
     newView->setSession(m_session);
     newView->setDocument(m_doc);
     newView->setCodeTable(m_codeTable);
-    newView->setTypingFont(m_view->typingFont());
 
+    // 替换视图
     auto* central = centralWidget();
     auto* layout = qobject_cast<QVBoxLayout*>(central->layout());
     QLayoutItem* oldItem = layout->replaceWidget(m_view, newView);
@@ -439,11 +448,20 @@ void MainWindow::switchMode(bool pacman)
     m_view = newView;
     old->deleteLater();
 
+    // 设置字体
     newView->setTypingFont(m_currentTypingFont);
+    newView->update();   // 触发一次重绘
 
+    // 连接信号
     connect(m_view, &TypingView::codeHintRequested,
             this, &MainWindow::onCodeHintRequested);
 
+    // ★ 最后 retry（会按已设好的测速点模式启动定时器）
+    if (!m_session->target().isEmpty()) {
+        m_session->retry();
+    }
+
+    updateStats();
     ensureViewFocus();
 }
 
@@ -656,7 +674,8 @@ void MainWindow::loadTextContent(const QString& raw, const QString& name)
     m_doc->loadFromString(content, name);
 
     // ---- 4. 设置测速点模式 ----
-    if (m_shuffleMode) {
+    const bool isFollowView = qobject_cast<TwoLineView*>(m_view) != nullptr;
+    if (isFollowView || m_shuffleMode) {
         m_session->setSpeedPointMode(TypingSession::TimeBased);
         m_session->setTimeInterval(20);
     } else {

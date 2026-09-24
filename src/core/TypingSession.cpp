@@ -58,6 +58,7 @@ void TypingSession::startFrom(const QString& targetText, int startIndex)
     m_snapshots.clear();
     m_hitSpeedPoints.clear();
     m_mistakes.clear();
+    m_userInput.clear();
     m_pausedElapsed = 0;
     m_state = Running;
     m_timer.start();
@@ -88,6 +89,7 @@ void TypingSession::reset()
     m_snapshots.clear();
     m_hitSpeedPoints.clear();
     m_mistakes.clear();
+    m_userInput.clear();
     m_timeSpeedTimer->stop();
     m_countdownTimer->stop();
     emit stateChanged(m_state);
@@ -151,6 +153,9 @@ bool TypingSession::inputCharacter(QChar ch)
     // 跳过后再判定能否接受输入
     if (m_state != Running) return false;
 
+    // 记录用户输入（无论对错都记）
+    m_userInput[m_currentIndex] = ch;
+
     ++m_keystrokes;
     const QChar expected = m_target.at(m_currentIndex);
 
@@ -190,6 +195,9 @@ bool TypingSession::backspace()
            m_target.at(m_currentIndex) == '\n') {
         --m_currentIndex;
     }
+
+    // 移除该位置的用户输入
+    m_userInput.remove(m_currentIndex);
 
     ++m_backspaces;
     if (m_state == Finished) {
@@ -276,4 +284,19 @@ double TypingSession::codeLength() const
 {
     int c = correctChars();
     return c > 0 ? double(m_keystrokes) / c : 0;
+}
+
+// ---------------------------------------------------------------
+// 模式
+// ---------------------------------------------------------------
+void TypingSession::setSpeedPointMode(SpeedPointMode mode)
+{
+    if (m_speedPointMode == mode) return;
+    m_speedPointMode = mode;
+
+    // 运行时切换：停掉旧的，按新决定是否启动
+    m_timeSpeedTimer->stop();
+    if (m_speedPointMode == TimeBased && m_state == Running) {
+        m_timeSpeedTimer->start(m_timeIntervalSec * 1000);
+    }
 }

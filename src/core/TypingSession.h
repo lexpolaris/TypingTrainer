@@ -7,6 +7,7 @@
 #include <QVector>
 #include <QSet>
 #include <QTimer>
+#include <QHash>
 
 struct SpeedPointSnapshot
 {
@@ -86,7 +87,7 @@ public:
     // 测速点
     void setSpeedPoints(const QVector<int>& positions);
     const QVector<SpeedPointSnapshot>& snapshots() const { return m_snapshots; }
-    void setSpeedPointMode(SpeedPointMode mode) { m_speedPointMode = mode; }
+    void setSpeedPointMode(SpeedPointMode mode);
     SpeedPointMode speedPointMode() const { return m_speedPointMode; }
     void setTimeInterval(int seconds) { m_timeIntervalSec = qMax(1, seconds); }
     int timeInterval() const { return m_timeIntervalSec; }
@@ -94,6 +95,10 @@ public:
     // 倒计时
     void setCountdown(int minutes);   // 0 表示不启用
     int countdown() const;
+
+    /// 用户实际输入的字符（position → 用户最后输入的字符）
+    /// 用于跟打模式下行显示
+    const QHash<int, QChar>& userInput() const { return m_userInput; }
 
 signals:
     void positionChanged(int index, bool correct);
@@ -128,4 +133,6 @@ private:
 
     int m_countdownMinutes = 0;
     QTimer* m_countdownTimer = nullptr;
+
+    QHash<int, QChar> m_userInput;
 };
