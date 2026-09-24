@@ -49,7 +49,6 @@ void ThemeManager::buildDefaultPalettes()
         {Current,       QColor(0x19, 0x76, 0xD2)},
         {Pending,       QColor(0x21, 0x21, 0x21)},
         {Error,         QColor(0xD3, 0x2F, 0x2F)},
-        {Pacman,        QColor(0xFF, 0xB3, 0x00)},
         {Highlight,     QColor(0xFF, 0xF1, 0x76)},
         {SelectionBg,   QColor(0x19, 0x76, 0xD2)},
         {SelectionText, QColor(0xFF, 0xFF, 0xFF)},
@@ -69,7 +68,6 @@ void ThemeManager::buildDefaultPalettes()
         {Current,       QColor(0x4F, 0x9E, 0xFF)},
         {Pending,       QColor(0xE8, 0xE8, 0xE8)},
         {Error,         QColor(0xFF, 0x6B, 0x6B)},
-        {Pacman,        QColor(0xFF, 0xD5, 0x4F)},
         {Highlight,     QColor(0x5C, 0x4A, 0x00)},
         {SelectionBg,   QColor(0x4F, 0x9E, 0xFF)},
         {SelectionText, QColor(0xFF, 0xFF, 0xFF)},
@@ -270,7 +268,6 @@ QString ThemeManager::roleName(Role role)
     case Current:       return QObject::tr("当前字符");
     case Pending:       return QObject::tr("未打字符");
     case Error:         return QObject::tr("错误字符");
-    case Pacman:        return QObject::tr("吃豆人色");
     case Highlight:     return QObject::tr("高亮背景");
     case SelectionBg:   return QObject::tr("选中背景");
     case SelectionText: return QObject::tr("选中文字");
@@ -285,7 +282,6 @@ QVector<ThemeManager::Role> ThemeManager::allRoles()
         TextPrimary, TextSecondary, TextDisabled,
         Accent, AccentText,
         Typed, Current, Pending, Error,
-        Pacman, Highlight, SelectionBg, SelectionText
     };
 }
 

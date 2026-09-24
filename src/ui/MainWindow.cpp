@@ -470,7 +470,7 @@ void MainWindow::switchMode(bool pacman)
     connect(m_view, &TypingView::codeHintRequested,
             this, &MainWindow::onCodeHintRequested);
 
-    // ★ 最后 retry（会按已设好的测速点模式启动定时器）
+    // 最后 retry（会按已设好的测速点模式启动定时器）
     if (!m_session->target().isEmpty()) {
         m_session->retry();
     }

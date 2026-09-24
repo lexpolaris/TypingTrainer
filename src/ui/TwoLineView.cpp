@@ -28,7 +28,7 @@ void TwoLineView::drawVisualLine(QPainter& p,
     const int y1 = baseY + m_marginY;                // 上行顶部
     const int y2 = y1 + fm.height() + m_lineGap;     // 下行顶部
 
-    // ★ 拿用户输入记录
+    // 拿用户输入记录
     const QHash<int, QChar>& userInput =
         m_session ? m_session->userInput() : QHash<int, QChar>();
 
@@ -41,24 +41,29 @@ void TwoLineView::drawVisualLine(QPainter& p,
         // =====================================================
         // 上行：原文
         // =====================================================
-        QColor upColor;
-        if (gi < idx)       upColor = th.color(ThemeManager::Typed);
-        else if (gi == idx) upColor = th.color(ThemeManager::Current);
-        else                upColor = th.color(ThemeManager::Pending);
-        p.setPen(upColor);
-        p.drawText(x, y1 + fm.ascent(), QString(ch));
+        // 已打过：不显示（透明）
+        // 当前：高亮
+        // 未打：正常
+        if (gi < idx) {
+            // 上行已打过 → 不画
+        } else if (gi == idx) {
+            p.setPen(th.color(ThemeManager::Current));
+            p.drawText(x, y1 + fm.ascent(), QString(ch));
+        } else {
+            p.setPen(th.color(ThemeManager::Pending));
+            p.drawText(x, y1 + fm.ascent(), QString(ch));
+        }
 
         // =====================================================
         // 下行：用户实际输入
         // =====================================================
         if (gi < idx) {
-            // 已打过的位置：显示用户当时输入的字符
+            // 已打过：显示用户输入的字符（黑色，与上行未打一致）
             const QChar userCh = userInput.value(gi, QChar());
             if (!userCh.isNull()) {
-                // 用户输入和原文不一致 → 用错误色
                 const bool wrong = (userCh != ch);
                 p.setPen(wrong ? th.color(ThemeManager::Error)
-                               : th.color(ThemeManager::Typed));
+                               : th.color(ThemeManager::Pending));
                 p.drawText(x, y2 + fm.ascent(), QString(userCh));
             }
         } else if (gi == idx) {
@@ -72,7 +77,6 @@ void TwoLineView::drawVisualLine(QPainter& p,
                                     : th.color(ThemeManager::Current));
 
             p.setPen(th.color(ThemeManager::AccentText));
-            // 有输入就显示用户的，否则显示原文作占位
             p.drawText(x, y2 + fm.ascent(),
                        QString(hasInput ? userCh : ch));
 
@@ -81,7 +85,7 @@ void TwoLineView::drawVisualLine(QPainter& p,
             p.drawLine(QPointF(x, y2 + fm.height()),
                        QPointF(x + cw, y2 + fm.height()));
         }
-        // 未打过的位置：下行不画
+        // 未打过：下行不画
 
         x += cw;
     }

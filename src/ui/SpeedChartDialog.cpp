@@ -89,18 +89,18 @@ void SpeedChartDialog::setupUi()
     root->addWidget(splitter, 2);
 
     // 图表
-#ifdef HAVE_QTCHARTS
-    m_chartView = new QChartView(this);
-    m_chartView->setRenderHint(QPainter::Antialiasing);
-    m_chartView->setMinimumHeight(200);
-    root->addWidget(m_chartView, 1);
-#else
-    auto* chartPlaceholder = new QLabel(
-        tr("（未启用 QtCharts，图表不可用。重新编译时确保 Qt6::Charts 可用）"),
-        this);
-    chartPlaceholder->setAlignment(Qt::AlignCenter);
-    root->addWidget(chartPlaceholder, 1);
-#endif
+    #ifdef HAVE_QTCHARTS
+        m_chartView = new QChartView(this);
+        m_chartView->setRenderHint(QPainter::Antialiasing);
+        m_chartView->setMinimumHeight(200);
+        root->addWidget(m_chartView, 1);
+    #else
+        auto* chartPlaceholder = new QLabel(
+            tr("（未启用 QtCharts，图表不可用。重新编译时确保 Qt6::Charts 可用）"),
+            this);
+        chartPlaceholder->setAlignment(Qt::AlignCenter);
+        root->addWidget(chartPlaceholder, 1);
+    #endif
 
     // 底部：汇总 + 按钮
     auto* bottomBar = new QHBoxLayout();

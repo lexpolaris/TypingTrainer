@@ -56,7 +56,7 @@ void HistoryDialog::setupUi()
     m_table->setEditTriggers(QAbstractItemView::NoEditTriggers);
     m_table->setAlternatingRowColors(true);
     m_table->horizontalHeader()->setStretchLastSection(true);
-    m_table->setSortingEnabled(true);   // ★ 允许点击表头排序
+    m_table->setSortingEnabled(true);   // 允许点击表头排序
     root->addWidget(m_table, 1);
 
     // ---- 底部：汇总 + 按钮 ----

@@ -30,7 +30,6 @@ public:
         Current,         // 当前字符
         Pending,         // 未打的字符
         Error,           // 错误字符
-        Pacman,          // 吃豆人颜色
         Highlight,       // 高亮背景
         SelectionBg,     // 选中背景
         SelectionText    // 选中文字
