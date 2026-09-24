@@ -9,13 +9,15 @@
 #include "SpeedChartDialog.h"
 #include "SettingsDialog.h"
 #include "MistakeDialog.h"
-#include "MusicLibraryDialog.h" 
+#include "MusicLibraryDialog.h"
+#include "HistoryDialog.h"
 
 #include "core/TextDocument.h"
 #include "core/TypingSession.h"
 #include "core/CodeTable.h"
 #include "core/TextShuffler.h"
 #include "core/TextFilter.h"
+#include "core/HistoryDb.h"
 
 #include "app/ConfigManager.h"
 #include "app/MusicPlayer.h"
@@ -66,6 +68,9 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
         auto& cfg = ConfigManager::instance();
         cfg.setLastReadPosition(m_docName, m_session->currentIndex());
         cfg.save();
+    });
+    connect(m_session, &TypingSession::finished, this, [this]() {
+        saveHistoryEntry();
     });
 
     auto& cfg = ConfigManager::instance();
@@ -183,6 +188,13 @@ void MainWindow::setupMenus()
     typeMenu->addSeparator();
     typeMenu->addAction(tr("错字列表..."), QKeySequence("Ctrl+M"),
                         this, &MainWindow::onShowMistakes);
+    typeMenu->addSeparator();
+    typeMenu->addAction(tr("历史成绩..."), QKeySequence("Ctrl+H"),
+                        this, [this]() {
+        HistoryDialog dlg(this);
+        dlg.exec();
+        ensureViewFocus();
+    });
 
     // ---------- 码表 ----------
     auto* codeMenu = menuBar()->addMenu(tr("码表(&C)"));
@@ -393,6 +405,7 @@ void MainWindow::loadText(const QString& path)
         QMessageBox::warning(this, tr("打开失败"), err);
         return;
     }
+    m_docKey = QFileInfo(path).absoluteFilePath();
     loadTextContent(text, QFileInfo(path).fileName());
 }
 
@@ -404,6 +417,7 @@ void MainWindow::loadResourceText(const QString& resPath)
         QMessageBox::warning(this, tr("加载失败"), err);
         return;
     }
+    m_docKey = resPath;
     loadTextContent(text, QFileInfo(resPath).fileName());
 }
 
@@ -920,4 +934,42 @@ void MainWindow::closeEvent(QCloseEvent* e)
 
     cfg.save();
     QMainWindow::closeEvent(e);
+}
+
+void MainWindow::saveHistoryEntry()
+{
+    if (!m_session || m_session->target().isEmpty()) return;
+    if (m_docName.isEmpty()) return;
+
+    // 过滤太短的记录（比如只打了两三个字就结束）
+    if (m_session->currentIndex() < 10) return;
+
+    HistoryEntry e;
+    e.timestamp       = QDateTime::currentDateTime();
+    e.docName         = m_docName;
+    e.docSource       = m_docKey.isEmpty() ? m_docName : m_docKey;
+    e.charCount       = m_session->currentIndex()
+                        - m_session->initialStartIndex();
+    e.correct         = m_session->correctChars();
+    e.errors          = m_session->errorChars();
+    e.backspaces      = m_session->backspaceCount();
+    e.durationSeconds = m_session->elapsedSeconds();
+    e.speedCPM        = m_session->speedCPM();
+    e.keystrokes      = m_session->totalKeystrokes();
+
+    // 准确率
+    const int total = e.charCount;
+    e.accuracy = (total > 0)
+                     ? (total - e.errors) * 100.0 / total
+                     : 0.0;
+    if (e.accuracy < 0) e.accuracy = 0;
+
+    // 码长
+    e.codeLength = (e.correct > 0)
+                       ? double(e.keystrokes) / e.correct
+                       : 0.0;
+
+    if (!HistoryDb::instance().add(e)) {
+        qWarning() << "保存历史失败:" << HistoryDb::instance().lastError();
+    }
 }

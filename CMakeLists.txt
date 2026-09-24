@@ -11,7 +11,7 @@ if(NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
 endif()
 
-find_package(Qt6 REQUIRED COMPONENTS Widgets Core Gui Charts Multimedia)
+find_package(Qt6 REQUIRED COMPONENTS Widgets Core Gui Charts Multimedia Sql)
 
 set(SOURCES
     src/main.cpp
@@ -44,6 +44,8 @@ set(SOURCES
     src/ui/settings/ThemeSettingsPage.cpp
     src/ui/settings/StartupSettingsPage.cpp
     src/ui/settings/FilterSettingsPage.cpp
+    src/core/HistoryDb.cpp
+    src/ui/HistoryDialog.cpp
 )
 
 set(HEADERS
@@ -76,6 +78,8 @@ set(HEADERS
     src/ui/settings/ThemeSettingsPage.h
     src/ui/settings/StartupSettingsPage.h
     src/ui/settings/FilterSettingsPage.h
+    src/core/HistoryDb.h
+    src/ui/HistoryDialog.h
 )
 
 add_executable(TypingTrainer ${SOURCES} ${HEADERS} resources/resources.qrc)
@@ -88,6 +92,7 @@ target_link_libraries(TypingTrainer PRIVATE
     Qt6::Gui
     Qt6::Charts
     Qt6::Multimedia
+    Qt6::Sql
 )
 
 if(Qt6Charts_FOUND)

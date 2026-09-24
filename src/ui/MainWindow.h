@@ -98,6 +98,9 @@ private:
     QToolButton* m_musicPlayBtn = nullptr;
     QToolButton* m_musicNextBtn = nullptr;
 
+    void saveHistoryEntry();
+    QString m_docKey;
+    
 protected:
     void closeEvent(QCloseEvent* e) override;
 };
